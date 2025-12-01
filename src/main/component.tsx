@@ -159,6 +159,7 @@ const cssRules = css`
   .video {
     flex-grow: 1;
     flex-shrink: 1;
+    overflow: hidden;
     position: relative;
     padding: 0.75rem;
     display: flex;
@@ -176,6 +177,13 @@ const cssRules = css`
     max-height: 100%;
     overflow: auto;
     flex-basis: 25%;
+
+    .placeholder {
+      color: #eee;
+      display: grid;
+      place-items: center;
+      max-width: 100%;
+    }
   }
 
   .presenter-view .webcams {
@@ -196,7 +204,8 @@ const cssRules = css`
   .screenshare {
     flex-basis: 75%;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: center;
 
     .screenshare-placeholder {
       display: grid;
@@ -206,6 +215,19 @@ const cssRules = css`
       border-radius: 0.5rem;
       color: #eee;
       background-color: #292929;
+      padding: 0.5rem;
+
+      span {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        max-width: 100%;
+      }
+    }
+
+    video {
+      height: 100%;
+      width: auto;
     }
   }
 
@@ -270,8 +292,9 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       try {
         // @ts-expect-error untyped
         const pipWindow = await documentPictureInPicture.requestWindow({
-          height: 400,
-          width: 800,
+          height: 260,
+          width: 480,
+          preferInitialWindowPlacement: true,
         });
 
         const pipDiv = pipWindow.document.createElement('div');

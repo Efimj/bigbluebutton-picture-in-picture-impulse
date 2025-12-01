@@ -65,9 +65,9 @@ function ScreenshareComponent(
         <div
           className="screenshare-placeholder"
         >
-          <div>
+          <div style={{ display: 'grid', placeItems: 'center' }}>
             <i className="icon-bbb-desktop_off" style={{ verticalAlign: 'baseline', marginRight: '2px' }} />
-            <span>
+            <span title="No screen sharing">
               No screen sharing
             </span>
           </div>
