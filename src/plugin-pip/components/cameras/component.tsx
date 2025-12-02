@@ -1,8 +1,7 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
-import { VIDEO_STREAMS_SUBSCRIPTION } from './queries';
-import { VideoStreamsSubscriptionResult } from './types';
+import { VIDEO_STREAMS_SUBSCRIPTION, type VideoStreamsSubscriptionResult } from './queries';
 
 const createVideoSelector = (streamId: string) => `.video-provider_list .videoContainer[data-stream="${streamId}"] video`;
 

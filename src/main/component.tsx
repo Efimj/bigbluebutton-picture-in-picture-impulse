@@ -270,8 +270,8 @@ interface MainComponentProps {
 function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
-  const pipActiveRef = React.useRef(false);
-  const [pipActive, setPipActive] = React.useState(false);
+  const pipActiveRef = React.useRef(JSON.parse(localStorage.getItem('pip-plugin-active')));
+  const [pipActive, setPipActive] = React.useState<boolean>(JSON.parse(localStorage.getItem('pip-plugin-active')));
 
   pluginApi.setActionButtonDropdownItems([
     new ActionButtonDropdownOption({
@@ -280,7 +280,8 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       label: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
       onClick: () => {
         pipActiveRef.current = !pipActiveRef.current;
-        setPipActive((p) => !p);
+        localStorage.setItem('pip-plugin-active', JSON.stringify(pipActiveRef.current));
+        setPipActive(pipActiveRef.current);
       },
       tooltip: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
     }),
