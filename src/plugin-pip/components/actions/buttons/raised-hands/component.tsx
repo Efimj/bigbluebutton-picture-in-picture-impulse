@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import Tooltip from '../../../ui/tooltip';
 import { RAISED_HAND_USERS, RaisedHandUsersSubscriptionResult } from './queries';
 
 interface RaisedHandsButtonComponentProps {
@@ -17,23 +18,25 @@ function RaisedHandsButtonComponent(
   const disabled = raisedHandCount === 0;
 
   return (
-    <button
-      className="media-btn"
-      type="button"
-      disabled={disabled}
-      onClick={() => {
-        pipWindow.close();
-      }}
-    >
-      <i className="icon-bbb-hand" />
-      {!disabled && (
+    <Tooltip content={raisedHandCount > 0 ? `${raisedHandCount} raised hands` : 'No raised hand'}>
+      <button
+        className="media-btn"
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          pipWindow.close();
+        }}
+      >
+        <i className="icon-bbb-hand" />
+        {!disabled && (
         <div className="badge">
           <span>
             {raisedHandUsers?.user_aggregate.aggregate.count}
           </span>
         </div>
-      )}
-    </button>
+        )}
+      </button>
+    </Tooltip>
   );
 }
 

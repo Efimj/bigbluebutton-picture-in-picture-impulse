@@ -3,6 +3,7 @@ import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { useExitVideo } from '../../hooks';
 import { VideoStreamsSubscriptionResult } from '../../../cameras/types';
 import { VIDEO_STREAMS_SUBSCRIPTION } from '../../../cameras/queries';
+import Tooltip from '../../../ui/tooltip';
 
 interface WebcamButtonComponentProps {
   pluginApi: PluginApi;
@@ -22,19 +23,21 @@ function WebcamButtonComponent({ pluginApi }: WebcamButtonComponentProps) {
   const amISharing = myStreams?.length > 0;
 
   return (
-    <button
-      className="media-btn"
-      type="button"
-      onClick={() => {
-        if (amISharing) exitVideo();
-      }}
-      disabled={!amISharing}
-    >
-      <span className="sr-only">
-        Stop webcams
-      </span>
-      <i className={`icon-bbb-${amISharing ? 'video' : 'video_off'}`} />
-    </button>
+    <Tooltip content={amISharing ? 'Stop sharing webcams' : 'You\'re not sharing webcam'}>
+      <button
+        className="media-btn"
+        type="button"
+        onClick={() => {
+          if (amISharing) exitVideo();
+        }}
+        disabled={!amISharing}
+      >
+        <span className="sr-only">
+          Stop webcams
+        </span>
+        <i className={`icon-bbb-${amISharing ? 'video' : 'video_off'}`} />
+      </button>
+    </Tooltip>
   );
 }
 

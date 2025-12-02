@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import Tooltip from '../../../ui/tooltip';
 import { PUBLIC_CHAT, PublicChatSubscriptionResult } from './queries';
 
 interface UnreadChatButtonComponentProps {
@@ -17,24 +18,26 @@ function UnreadChatButtonComponent(
   const disabled = unreadCount === 0;
 
   return (
-    <button
-      className="media-btn"
-      type="button"
-      disabled={disabled}
-      onClick={() => {
-        pluginApi.uiCommands.chat.form.open();
-        pipWindow.close();
-      }}
-    >
-      <i className="icon-bbb-group_chat" />
-      {!disabled && (
+    <Tooltip content={unreadCount > 0 ? `${unreadCount} unread messages` : 'No unread messages'}>
+      <button
+        className="media-btn"
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          pluginApi.uiCommands.chat.form.open();
+          pipWindow.close();
+        }}
+      >
+        <i className="icon-bbb-group_chat" />
+        {!disabled && (
         <div className="badge">
           <span>
             {publicChat?.chat[0].totalUnread}
           </span>
         </div>
-      )}
-    </button>
+        )}
+      </button>
+    </Tooltip>
   );
 }
 
