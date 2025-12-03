@@ -165,7 +165,7 @@ const cssRules = css`
     gap: 1rem;
   }
 
-  .presenter-view .video {
+  .presenter-view.has-screenshare.has-webcams .video {
     flex-direction: row-reverse;
   }
 
@@ -191,6 +191,14 @@ const cssRules = css`
     }
   }
 
+  .viewer-view:not(.has-screenshare) .video {
+    flex-direction: row;
+  }
+
+  .viewer-view:not(.has-screenshare) .webcams {
+    flex-direction: row;
+  }
+
   .has-screenshare .webcams {
     flex-basis: 25%;
   }
@@ -205,6 +213,7 @@ const cssRules = css`
     position: relative;
     max-width: 240px;
     max-height: 240px;
+    min-height: 80px;
     overflow: hidden;
   }
 
