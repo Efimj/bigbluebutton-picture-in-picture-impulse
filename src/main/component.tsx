@@ -45,7 +45,6 @@ const cssRules = css`
   }
 
   video {
-    width: 100%;
     border-radius: 8px;
   }
 
@@ -163,7 +162,7 @@ const cssRules = css`
     position: relative;
     padding: 0.75rem;
     display: flex;
-    gap: 2rem;
+    gap: 1rem;
   }
 
   .presenter-view .video {
@@ -176,7 +175,7 @@ const cssRules = css`
     gap: 0.25rem;
     max-height: 100%;
     overflow: auto;
-    flex-basis: 25%;
+    flex-basis: 100%;
 
     .placeholder {
       color: #eee;
@@ -184,6 +183,16 @@ const cssRules = css`
       place-items: center;
       max-width: 100%;
     }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .has-screenshare .webcams {
+    flex-basis: 25%;
   }
 
   .presenter-view .webcams {
@@ -195,14 +204,17 @@ const cssRules = css`
   .pip-video-container {
     position: relative;
     max-width: 240px;
+    max-height: 240px;
+    overflow: hidden;
   }
 
   .presenter-view .pip-video-container {
     min-width: 120px;
+    height: 100%;
   }
 
   .screenshare {
-    flex-basis: 75%;
+    flex-basis: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -228,10 +240,15 @@ const cssRules = css`
     video {
       height: 100%;
       width: auto;
+      object-position: top;
     }
   }
 
-  .presenter-view .screenshare {
+  .viewer-view.has-webcams .screenshare {
+    flex-basis: 75%;
+  }
+
+  .presenter-view.has-webcams .screenshare {
     flex-basis: 25%;
   }
 

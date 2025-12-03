@@ -1,6 +1,6 @@
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import * as React from 'react';
-import { SCREENSHARE, ScreenshareSubscriptionResult } from './queries';
+import { useScreenshare } from './hooks';
 
 interface Media {
   srcObject: MediaProvider;
@@ -36,9 +36,7 @@ function ScreenshareComponent(
 ): React.ReactNode {
   const {
     data: screenshareData,
-  } = pluginApi.useCustomSubscription!<ScreenshareSubscriptionResult>(
-    SCREENSHARE,
-  );
+  } = useScreenshare(pluginApi);
   const [screenshare, setScreenshare] = React.useState<Media | null>(null);
 
   React.useEffect(() => {
@@ -58,22 +56,7 @@ function ScreenshareComponent(
   }, [screenshareData]);
 
   if (!screenshare) {
-    return (
-      <div
-        className="screenshare"
-      >
-        <div
-          className="screenshare-placeholder"
-        >
-          <div style={{ display: 'grid', placeItems: 'center' }}>
-            <i className="icon-bbb-desktop_off" style={{ verticalAlign: 'baseline', marginRight: '2px' }} />
-            <span title="No screen sharing">
-              No screen sharing
-            </span>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
-import { VIDEO_STREAMS_SUBSCRIPTION, type VideoStreamsSubscriptionResult } from './queries';
+import { useVideoStreams } from './hooks';
 
 const createVideoSelector = (streamId: string) => `.video-provider_list .videoContainer[data-stream="${streamId}"] video`;
 
@@ -45,9 +45,7 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
 
   const {
     data: videoStreamsData,
-  } = pluginApi.useCustomSubscription<VideoStreamsSubscriptionResult>(
-    VIDEO_STREAMS_SUBSCRIPTION,
-  );
+  } = useVideoStreams(pluginApi);
   const { data: currentUser } = pluginApi.useCurrentUser();
 
   useEffect(() => {
@@ -93,16 +91,7 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
   }, [videoStreamsData]);
 
   if (!videos.length) {
-    return (
-      <div id="plugin-pip-webcams" className="webcams">
-        <div className="placeholder">
-          <i className="icon-bbb-video_off" />
-          <span>
-            No webcam was shared
-          </span>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
