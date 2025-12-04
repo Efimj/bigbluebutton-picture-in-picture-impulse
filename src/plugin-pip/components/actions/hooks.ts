@@ -12,10 +12,8 @@ import {
 } from './queries';
 import {
   VIDEO_STREAMS_SUBSCRIPTION,
+  type VideoStreamsSubscriptionResult,
 } from '../../components/cameras/queries';
-import {
-  VideoStreamsSubscriptionResult,
-} from '../../components/cameras/types';
 
 export const useToggleVoice = (pluginApi: PluginApi) => {
   const [

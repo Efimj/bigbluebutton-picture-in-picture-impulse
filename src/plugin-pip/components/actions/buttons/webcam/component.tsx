@@ -1,8 +1,7 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { useExitVideo } from '../../hooks';
-import { VideoStreamsSubscriptionResult } from '../../../cameras/types';
-import { VIDEO_STREAMS_SUBSCRIPTION } from '../../../cameras/queries';
+import { VIDEO_STREAMS_SUBSCRIPTION, type VideoStreamsSubscriptionResult } from '../../../cameras/queries';
 import Tooltip from '../../../ui/tooltip';
 
 interface WebcamButtonComponentProps {
