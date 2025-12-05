@@ -15,22 +15,10 @@ function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElemen
   const getRoleColor = (role: string | null): string => {
     const roleColors: Record<string, string> = {
       MODERATOR: '#3b82f6',
-      PRESENTER: '#8b5cf6',
-      VIEWER: '#6b7280',
+      VIEWER: '#8b5cf6',
     };
     return role ? (roleColors[role] || '#6b7280') : '#6b7280';
   };
-
-  const getRoleBadgeStyles = (role: string | null): React.CSSProperties => ({
-    backgroundColor: getRoleColor(role),
-    color: '#fff',
-    padding: '2px 8px',
-    borderRadius: '4px',
-    fontSize: '10px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  });
 
   const containerStyles: React.CSSProperties = {
     display: 'flex',
@@ -49,8 +37,8 @@ function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElemen
   const avatarStyles: React.CSSProperties = {
     width: '32px',
     height: '32px',
-    borderRadius: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: message.senderRole === 'VIEWER' ? '50%' : '0.5rem',
+    backgroundColor: getRoleColor(message.senderRole),
     textTransform: 'capitalize',
     display: 'flex',
     alignItems: 'center',
@@ -110,20 +98,15 @@ function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElemen
         <div style={nameStyles}>
           {message.senderName || 'Unknown User'}
         </div>
-        {message.senderRole && (
-          <div style={getRoleBadgeStyles(message.senderRole)}>
-            {message.senderRole}
+        {message.createdAt && (
+          <div style={footerStyles}>
+            {formatTime(message.createdAt)}
           </div>
         )}
       </div>
       <div style={messageStyles}>
         {message.message}
       </div>
-      {message.createdAt && (
-        <div style={footerStyles}>
-          {formatTime(message.createdAt)}
-        </div>
-      )}
     </div>
   );
 }
@@ -145,7 +128,7 @@ function ChatNotifier({ pluginApi }: ChatNotifierProps): React.ReactNode {
   React.useEffect(() => {
     if (!chatMessageStream?.chat_message_stream) return;
     chatMessageStream.chat_message_stream.forEach((msg) => {
-      showToast(<ChatMessageToast message={msg} />, 'default', 5000);
+      showToast(<ChatMessageToast message={msg} />, 'default', 20000);
     });
   }, [chatMessageStream, showToast]);
 
