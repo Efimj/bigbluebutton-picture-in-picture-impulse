@@ -299,19 +299,21 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   const pipActiveRef = React.useRef(JSON.parse(localStorage.getItem('pip-plugin-active')));
   const [pipActive, setPipActive] = React.useState<boolean>(JSON.parse(localStorage.getItem('pip-plugin-active')));
 
-  pluginApi.setActionButtonDropdownItems([
-    new ActionButtonDropdownOption({
-      allowed: true,
-      icon: pipActive ? 'desktop_off' : 'desktop',
-      label: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
-      onClick: () => {
-        pipActiveRef.current = !pipActiveRef.current;
-        localStorage.setItem('pip-plugin-active', JSON.stringify(pipActiveRef.current));
-        setPipActive(pipActiveRef.current);
-      },
-      tooltip: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
-    }),
-  ]);
+  if (isPipSupported) {
+    pluginApi.setActionButtonDropdownItems([
+      new ActionButtonDropdownOption({
+        allowed: true,
+        icon: pipActive ? 'desktop_off' : 'desktop',
+        label: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
+        onClick: () => {
+          pipActiveRef.current = !pipActiveRef.current;
+          localStorage.setItem('pip-plugin-active', JSON.stringify(pipActiveRef.current));
+          setPipActive(pipActiveRef.current);
+        },
+        tooltip: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
+      }),
+    ]);
+  }
 
   // @ts-expect-error untyped
   navigator.mediaSession.setActionHandler('enterpictureinpicture', async () => {
