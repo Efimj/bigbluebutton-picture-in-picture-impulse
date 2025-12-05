@@ -46,6 +46,11 @@ const cssRules = css`
 
   video {
     border-radius: 8px;
+    border: 2px solid transparent;
+  }
+
+  video.talking {
+    border-color: #3b82f6;
   }
 
   html {

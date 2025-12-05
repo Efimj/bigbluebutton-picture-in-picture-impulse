@@ -6,6 +6,9 @@ export const VIDEO_STREAMS_SUBSCRIPTION = `
         name
         userId
       }
+      voice {
+        talking
+      }
     }
   }
 `;
@@ -16,6 +19,9 @@ export interface VideoStreamsSubscriptionResult {
     user: {
       name: string
       userId: string
+    };
+    voice?: {
+      talking: boolean;
     };
   }[];
 }

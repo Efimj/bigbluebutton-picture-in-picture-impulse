@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useEffect } from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { useVideoStreams } from './hooks';
+import Video from './video';
 
 const createVideoSelector = (streamId: string) => `.video-provider_list .videoContainer[data-stream="${streamId}"] video`;
 
@@ -34,6 +35,7 @@ interface Media {
   streamId: string;
   userName: string;
   userId: string;
+  userTalking: boolean;
 }
 
 interface CamerasComponentProps {
@@ -57,16 +59,16 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
       const videosSrc = streams.map(
         async (stream) => {
           const existingVideo = videos.find((video) => video.streamId === stream.streamId);
-          if (existingVideo) {
-            return existingVideo;
-          }
 
-          const srcObject = await pollForVideoSrc(stream.streamId, videoList);
+          const srcObject = existingVideo
+            ? existingVideo.srcObject
+            : await pollForVideoSrc(stream.streamId, videoList);
 
           return {
             streamId: stream.streamId,
             userName: stream.user.name,
             userId: stream.user.userId,
+            userTalking: stream?.voice?.talking,
             srcObject,
           };
         },
@@ -74,13 +76,14 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
 
       const videosResolved = await Promise.all(videosSrc);
       videosResolved.forEach(({
-        srcObject, streamId, userName, userId,
+        srcObject, streamId, userName, userId, userTalking,
       }) => {
         newVideos.push({
           srcObject,
           streamId,
           userName,
           userId,
+          userTalking,
         });
       });
 
@@ -106,17 +109,7 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
         return 0;
       }).map((video) => (
         <div key={video.streamId} className="pip-video-container">
-          <video
-            autoPlay
-            playsInline
-            muted
-            ref={(ref) => {
-              if (ref && video.srcObject) {
-                // eslint-disable-next-line no-param-reassign
-                ref.srcObject = video.srcObject;
-              }
-            }}
-          />
+          <Video srcObject={video.srcObject} talking={video.userTalking} />
           <span className="username">
             {video.userName}
           </span>
