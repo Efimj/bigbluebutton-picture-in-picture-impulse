@@ -55,6 +55,7 @@ const cssRules = css`
 
   html {
     height: 100%;
+    overflow: hidden;
   }
 
   body {
@@ -188,12 +189,15 @@ const cssRules = css`
       place-items: center;
       max-width: 100%;
     }
+  }
 
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+  .presenter-view .webcams video {
+    width: 100%;
+    height: 100%;
+  }
+
+  .viewer-view .webcams video {
+    height: 100%;
   }
 
   .viewer-view:not(.has-screenshare) .video {
@@ -209,22 +213,23 @@ const cssRules = css`
   }
 
   .presenter-view .webcams {
-    flex-basis: 75%;
+    flex-basis: 100%;
     flex-direction: row;
     align-items: center;
   }
 
+  .presenter-view.has-screenshare .webcams {
+    flex-basis: 75%;
+  }
+
   .pip-video-container {
     position: relative;
-    max-width: 240px;
-    max-height: 240px;
-    min-height: 80px;
-    overflow: hidden;
+    display: flex;
   }
 
   .presenter-view .pip-video-container {
-    min-width: 120px;
-    height: 100%;
+    max-width: 240px;
+    min-width: 80px;
   }
 
   .screenshare {
@@ -258,6 +263,10 @@ const cssRules = css`
     }
   }
 
+  .container:not(.has-webcams) .screenshare video {
+    object-position: center;
+  }
+
   .viewer-view.has-webcams .screenshare {
     flex-basis: 75%;
   }
@@ -287,7 +296,7 @@ const cssRules = css`
     color: white;
     left: 0.25rem;
     bottom: 0.25rem;
-    font-size: 75%;
+    font-size: 65%;
     background-color: #111111CC;
     padding: 0.2rem;
     border-radius: 0.75rem;
@@ -326,7 +335,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       try {
         // @ts-expect-error untyped
         const pipWindow = await documentPictureInPicture.requestWindow({
-          height: 260,
+          height: 270,
           width: 480,
           preferInitialWindowPlacement: true,
         });
