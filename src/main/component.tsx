@@ -178,6 +178,7 @@ const cssRules = css`
   .webcams {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 0.25rem;
     max-height: 100%;
     overflow: auto;
@@ -197,6 +198,7 @@ const cssRules = css`
   }
 
   .viewer-view .webcams video {
+    width: 100%;
     height: 100%;
   }
 
@@ -212,10 +214,10 @@ const cssRules = css`
     flex-basis: 25%;
   }
 
-  .presenter-view .webcams {
+  .presenter-view .webcams,
+  .viewer-view:not(.has-screenshare) .webcams {
     flex-basis: 100%;
-    flex-direction: row;
-    align-items: center;
+    display: grid;
   }
 
   .presenter-view.has-screenshare .webcams {

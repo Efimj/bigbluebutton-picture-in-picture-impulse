@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { useVideoStreams } from './hooks';
 import Video from './video';
+import { useScreenshare } from '../screenshare/hooks';
 
 const createVideoSelector = (streamId: string) => `.video-provider_list .videoContainer[data-stream="${streamId}"] video`;
 
@@ -49,6 +50,10 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
     data: videoStreamsData,
   } = useVideoStreams(pluginApi);
   const { data: currentUser } = pluginApi.useCurrentUser();
+  const {
+    data: screenshareData,
+  } = useScreenshare(pluginApi);
+  const isSharingScreen = Boolean(screenshareData?.screenshare[0]?.stream);
 
   useEffect(() => {
     async function update() {
@@ -97,8 +102,12 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
     return null;
   }
 
+  const style: React.CSSProperties = currentUser?.presenter || !isSharingScreen ? {
+    gridTemplateColumns: `repeat(${videos.length}, minmax(min-content, max-content))`,
+  } : {};
+
   return (
-    <div id="plugin-pip-webcams" className="webcams">
+    <div id="plugin-pip-webcams" className="webcams" style={style}>
       {videos.sort((video1, video2) => {
         if (video1.userId === currentUser?.userId) {
           return -1;
