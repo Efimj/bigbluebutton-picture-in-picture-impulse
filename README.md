@@ -11,12 +11,12 @@ A plugin that starts up a picture-in-picture window with webcams and screen shar
 To build the plugin for production use, follow these steps:
 
 ```bash
-cd $HOME/src/plugin-detach-video
+cd $HOME/src/bbb-plugin-picture-in-picture
 npm ci
 npm run build-bundle
 ```
 
-The above command will generate the `dist` folder, containing the bundled JavaScript file named `PluginDetachVideo.js`. This file can be hosted on any HTTPS server along with its `manifest.json`.
+The above command will generate the `dist` folder, containing the bundled JavaScript file named `PluginPictureInPicture.js`. This file can be hosted on any HTTPS server along with its `manifest.json`.
 
 If you install the Plugin separated to the manifest, remember to change the `javascriptEntrypointUrl` in the `manifest.json` to the correct endpoint.
 
