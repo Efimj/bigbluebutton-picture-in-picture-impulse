@@ -5,8 +5,8 @@ const path = require('path');
 module.exports = {
   entry: './src/index.tsx',
   output: {
-    filename: 'PluginDetachVideo.js',
-    library: 'PluginDetachVideo',
+    filename: 'PluginPictureInPicture.js',
+    library: 'PluginPictureInPicture',
     libraryTarget: 'umd',
     publicPath: '/',
     globalObject: 'this',
