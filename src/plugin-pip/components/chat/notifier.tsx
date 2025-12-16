@@ -64,6 +64,10 @@ function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElemen
     lineHeight: '1.5',
     color: 'rgba(255, 255, 255, 0.95)',
     wordBreak: 'break-word',
+    maxHeight: '40px',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
   };
 
   const footerStyles: React.CSSProperties = {

@@ -7,11 +7,18 @@ export interface Toast {
   content: React.ReactNode;
   type: ToastType;
   duration?: number;
+  dismissible?: boolean;
 }
 
 interface ToastContextValue {
   toasts: Toast[];
-  showToast: (content: React.ReactNode, type?: ToastType, duration?: number) => void;
+  showToast: (
+    content: React.ReactNode,
+    type?: ToastType,
+    duration?: number,
+    dismissible?: boolean,
+    idPrefix?: string,
+  ) => void;
   hideToast: (id: string) => void;
 }
 
@@ -140,16 +147,18 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
     <div style={toastStyles}>
       {getIcon(toast.type) && <div style={iconStyles}>{getIcon(toast.type)}</div>}
       <div style={messageStyles}>{toast.content}</div>
-      <button
-        type="button"
-        onClick={handleClose}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-        style={closeButtonStyles}
-        aria-label="Close notification"
-      >
-        ×
-      </button>
+      {toast.dismissible && (
+        <button
+          type="button"
+          onClick={handleClose}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+          style={closeButtonStyles}
+          aria-label="Close notification"
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }
@@ -158,12 +167,15 @@ function ToastContainer({ toasts, onClose }: ToastContainerProps) {
   const containerStyles: React.CSSProperties = {
     position: 'fixed',
     top: '20px',
+    bottom: '20px',
     right: '20px',
-    zIndex: 9999,
+    zIndex: 9998,
     display: 'flex',
     flexDirection: 'column',
     gap: '10px',
     pointerEvents: 'none',
+    overflowX: 'hidden',
+    overflowY: 'auto',
   };
 
   return (
@@ -186,16 +198,19 @@ export function ToastProvider({ children }: ToastProviderProps) {
     content: React.ReactNode,
     type: ToastType = 'default',
     duration: number = 3000,
+    dismissible: boolean = true,
+    idPrefix: string = 'toast',
   ) => {
-    const id = `toast-${Date.now()}-${Math.random()}`;
+    const id = `${idPrefix}-${Date.now()}-${Math.random()}`;
     const toast: Toast = {
       id,
       content,
       type,
       duration,
+      dismissible,
     };
 
-    setToasts((prev) => [...prev, toast]);
+    setToasts((prev) => [toast, ...prev].slice(0, 3));
 
     if (duration > 0) {
       setTimeout(() => {

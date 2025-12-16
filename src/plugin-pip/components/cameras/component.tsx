@@ -4,13 +4,14 @@ import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { useVideoStreams } from './hooks';
 import Video from './video';
 import { useScreenshare } from '../screenshare/hooks';
+import Loader from '../ui/loader';
 
 const createVideoSelector = (streamId: string) => `.video-provider_list .videoContainer[data-stream="${streamId}"] video`;
 
 const pollForVideoSrc = (
   streamId: string,
   container: Element = document.body,
-): Promise<MediaProvider> => new Promise((resolve, reject) => {
+): Promise<MediaStream | null> => new Promise((resolve) => {
   const TIMEOUT = 5000; // 5 seconds
   const start = performance.now();
   const selector = createVideoSelector(streamId);
@@ -18,10 +19,10 @@ const pollForVideoSrc = (
   const poll = (timestamp: number) => {
     const element = container.querySelector(selector);
     if (element && element instanceof HTMLVideoElement && element.srcObject) {
-      return resolve(element.srcObject);
+      return resolve(element.srcObject as MediaStream);
     }
     if (timestamp - start > TIMEOUT) {
-      return reject();
+      return resolve(null);
     }
     return requestAnimationFrame(poll);
   };
@@ -32,7 +33,7 @@ const pollForVideoSrc = (
 const VIDEO_LIST_CLASSNAME = 'video-provider_list';
 
 interface Media {
-  srcObject: MediaProvider;
+  srcObject: MediaStream;
   streamId: string;
   userName: string;
   userId: string;
@@ -45,6 +46,7 @@ interface CamerasComponentProps {
 
 function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode {
   const [videos, setVideos] = React.useState<Media[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
   const {
     data: videoStreamsData,
@@ -59,44 +61,39 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
     async function update() {
       const videoList = document.getElementsByClassName(VIDEO_LIST_CLASSNAME)[0];
       const streams = videoStreamsData?.user_camera || [];
-      const newVideos: Media[] = [];
 
-      const videosSrc = streams.map(
+      const videoSrc = streams.map(
         async (stream) => {
-          const existingVideo = videos.find((video) => video.streamId === stream.streamId);
-
-          const srcObject = existingVideo
-            ? existingVideo.srcObject
-            : await pollForVideoSrc(stream.streamId, videoList);
+          const srcObject = await pollForVideoSrc(stream.streamId, videoList);
 
           return {
-            streamId: stream.streamId,
-            userName: stream.user.name,
-            userId: stream.user.userId,
+            streamId: stream?.streamId,
+            userName: stream?.user?.name,
+            userId: stream?.user?.userId,
             userTalking: stream?.voice?.talking,
             srcObject,
           };
         },
       );
 
-      const videosResolved = await Promise.all(videosSrc);
-      videosResolved.forEach(({
-        srcObject, streamId, userName, userId, userTalking,
-      }) => {
-        newVideos.push({
-          srcObject,
-          streamId,
-          userName,
-          userId,
-          userTalking,
-        });
-      });
+      const videoResolved = await Promise.all(videoSrc);
 
-      setVideos(newVideos);
+      setVideos(videoResolved.filter((v) => v.srcObject));
     }
 
-    update();
+    setLoading(true);
+    update().finally(() => {
+      setLoading(false);
+    });
   }, [videoStreamsData]);
+
+  if (loading && !videos.length) {
+    return (
+      <div className="webcams" style={{ justifyContent: 'center' }}>
+        <Loader />
+      </div>
+    );
+  }
 
   if (!videos.length) {
     return null;
@@ -104,7 +101,9 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
 
   const style: React.CSSProperties = currentUser?.presenter || !isSharingScreen ? {
     gridTemplateColumns: `repeat(${videos.length}, minmax(min-content, max-content))`,
-  } : {};
+  } : {
+    gridTemplateRows: `repeat(${videos.length}, minmax(min-content, max-content))`,
+  };
 
   return (
     <div id="plugin-pip-webcams" className="webcams" style={style}>

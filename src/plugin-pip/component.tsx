@@ -1,20 +1,21 @@
 import * as React from 'react';
-import { BbbPluginSdk } from 'bigbluebutton-html-plugin-sdk';
+import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import CamerasComponent from './components/cameras/component';
 import ActionsComponent from './components/actions/component';
 import ScreenshareComponent from './components/screenshare/component';
 import ChatNotifier from './components/chat/notifier';
+import RaisedHandNotifier from './components/raised-hands/component';
 import { ToastProvider } from './components/ui/toast';
 import { useVideoStreams } from './components/cameras/hooks';
 import { useScreenshare } from './components/screenshare/hooks';
+import { PipWindowProvider } from './components/contexts/pip-window';
 
 interface PluginPipProps {
-  pluginUuid: string;
+  pluginApi: PluginApi;
   pipWindow: Window;
 }
 
-function PluginPip({ pluginUuid, pipWindow }: PluginPipProps): React.ReactNode {
-  const pluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
+function PluginPip({ pluginApi, pipWindow }: PluginPipProps): React.ReactNode {
   const { data: currentUser } = pluginApi.useCurrentUser();
   const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
@@ -29,16 +30,20 @@ function PluginPip({ pluginUuid, pipWindow }: PluginPipProps): React.ReactNode {
   if (hasScreenshare) containerClassName.push('has-screenshare');
 
   return (
-    <ToastProvider>
-      <div className={containerClassName.join(' ')}>
-        <div className="video">
-          <ScreenshareComponent pluginApi={pluginApi} />
-          <CamerasComponent pluginApi={pluginApi} />
+    <PipWindowProvider pipWindow={pipWindow}>
+      <ToastProvider>
+        <div className={containerClassName.join(' ')}>
+          <div className="video">
+            <ScreenshareComponent pluginApi={pluginApi} />
+            <CamerasComponent pluginApi={pluginApi} />
+          </div>
+          <ActionsComponent pluginApi={pluginApi} pipWindow={pipWindow} />
         </div>
-        <ActionsComponent pluginApi={pluginApi} pipWindow={pipWindow} />
-      </div>
-      <ChatNotifier pluginApi={pluginApi} />
-    </ToastProvider>
+        <ChatNotifier pluginApi={pluginApi} />
+        {presenter && <RaisedHandNotifier pluginApi={pluginApi} />}
+        <div id="modals-root" style={{ zIndex: 9999 }} />
+      </ToastProvider>
+    </PipWindowProvider>
   );
 }
 
