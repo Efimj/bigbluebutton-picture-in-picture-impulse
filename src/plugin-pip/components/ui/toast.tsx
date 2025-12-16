@@ -210,7 +210,10 @@ export function ToastProvider({ children }: ToastProviderProps) {
       dismissible,
     };
 
-    setToasts((prev) => [toast, ...prev].slice(0, 3));
+    setToasts((prev) => {
+      const t = [toast, ...prev];
+      return duration > 0 ? t.slice(0, 3) : t;
+    });
 
     if (duration > 0) {
       setTimeout(() => {
