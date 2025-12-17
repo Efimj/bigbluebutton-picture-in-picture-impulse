@@ -181,7 +181,7 @@ function RaisedHandNotifier({ pluginApi }: RaisedHandNotifierProps): React.React
         <RaisedHandContent user={user} lowerUserHands={lowerUserHands} />,
         'default',
         0, // Persistent toast (duration = 0)
-        false, // Not dismissible by user
+        true, // Dismissible by user
         user.userId,
       );
     });
