@@ -1,6 +1,7 @@
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import * as React from 'react';
 import { useScreenshare } from './hooks';
+import Video from './video';
 
 interface Media {
   srcObject: MediaProvider;
@@ -61,17 +62,9 @@ function ScreenshareComponent(
 
   return (
     <div className="screenshare">
-      <video
+      <Video
         key={screenshareData?.screenshare[0]?.stream}
-        autoPlay
-        playsInline
-        muted
-        ref={(ref) => {
-          if (ref && screenshare.srcObject) {
-            // eslint-disable-next-line no-param-reassign
-            ref.srcObject = screenshare.srcObject;
-          }
-        }}
+        srcObject={screenshare.srcObject}
       />
     </div>
   );

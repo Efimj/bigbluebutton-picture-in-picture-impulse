@@ -3,6 +3,8 @@ import * as ReactDOM from 'react-dom/client';
 import { ActionButtonDropdownOption, BbbPluginSdk } from 'bigbluebutton-html-plugin-sdk';
 import { css } from 'styled-components';
 import Pip from '../plugin-pip/component';
+import { useVideoStreams } from '../plugin-pip/components/cameras/hooks';
+import { useScreenshare } from '../plugin-pip/components/screenshare/hooks';
 
 const isPipSupported = 'documentPictureInPicture' in window;
 
@@ -171,71 +173,35 @@ const cssRules = css`
     gap: 1rem;
   }
 
-  .presenter-view.has-screenshare.has-webcams .video {
-    flex-direction: row-reverse;
-  }
-
   .webcams {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: grid;
+    place-items: center;
     gap: 0.25rem;
     max-height: 100%;
     overflow: auto;
-    flex-basis: 100%;
-
-    .placeholder {
-      color: #eee;
-      display: grid;
-      place-items: center;
-      max-width: 100%;
-    }
   }
 
-  .presenter-view .webcams video {
+  .webcams video {
     width: 100%;
     height: 100%;
   }
 
-  .viewer-view .webcams video {
-    width: 100%;
-    height: 100%;
-  }
-
-  .viewer-view:not(.has-screenshare) .video {
-    flex-direction: row;
-  }
-
-  .viewer-view:not(.has-screenshare) .webcams {
-    flex-direction: row;
-  }
-
-  .has-screenshare .webcams {
-    flex-basis: 25%;
-  }
-
-  .presenter-view .webcams,
-  .viewer-view:not(.has-screenshare) .webcams {
-    flex-basis: 100%;
-    display: grid;
-  }
-
-  .presenter-view.has-screenshare .webcams {
-    flex-basis: 75%;
+  .presenter-view.has-screenshare.has-webcams .video {
+    flex-direction: row-reverse;
   }
 
   .pip-video-container {
     position: relative;
     display: flex;
+    max-width: 240px;
+    min-width: 120px;
   }
 
-  .presenter-view .pip-video-container {
-    max-width: 240px;
-    min-width: 80px;
+  .viewer-view.has-screenshare .pip-video-container {
+    max-width: 160px;
   }
 
   .screenshare {
-    flex-basis: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -269,12 +235,37 @@ const cssRules = css`
     object-position: center;
   }
 
-  .viewer-view.has-webcams .screenshare {
-    flex-basis: 75%;
+  .viewer-view.has-screenshare.has-webcams .screenshare {
+    flex-grow: 1;
   }
 
-  .presenter-view.has-webcams .screenshare {
-    flex-basis: 25%;
+  .viewer-view.has-screenshare.has-webcams .webcams {
+    max-width: max-content;
+    min-width: min-content;
+  }
+
+  .viewer-view:not(.has-screenshare).has-webcams .webcams {
+    flex-grow: 1;
+  }
+
+  .viewer-view.has-screenshare:not(.has-webcams) .screenshare {
+    flex-grow: 1;
+  }
+
+  .presenter-view.has-screenshare.has-webcams .screenshare {
+    max-width: 25%;
+  }
+
+  .presenter-view.has-screenshare.has-webcams .webcams {
+    flex-grow: 1;
+  }
+
+  .presenter-view:not(.has-screenshare).has-webcams .webcams {
+    flex-grow: 1;
+  }
+
+  .presenter-view.has-screenshare:not(.has-webcams) .screenshare {
+    flex-grow: 1;
   }
 
   @keyframes pulse {
@@ -302,6 +293,10 @@ const cssRules = css`
     background-color: #111111CC;
     padding: 0.2rem;
     border-radius: 0.75rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 80%;
   }
 `;
 
@@ -313,7 +308,16 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
   const pipActiveRef = React.useRef(JSON.parse(localStorage.getItem('pip-plugin-active')));
+  const pipWindowRef = React.useRef<Window | null>(null);
+  const pipRootRef = React.useRef<ReactDOM.Root | null>(null);
+  const hasMediaRef = React.useRef(false);
   const [pipActive, setPipActive] = React.useState<boolean>(JSON.parse(localStorage.getItem('pip-plugin-active')));
+  const { data: webcams } = useVideoStreams(pluginApi);
+  const { data: screenshare } = useScreenshare(pluginApi);
+  const hasWebcams = Boolean(webcams?.user_camera?.length);
+  const hasScreenshare = Boolean(screenshare?.screenshare?.length);
+  const hasMedia = hasScreenshare || hasWebcams;
+  hasMediaRef.current = hasMedia;
 
   if (isPipSupported) {
     pluginApi.setActionButtonDropdownItems([
@@ -331,58 +335,76 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     ]);
   }
 
-  // @ts-expect-error untyped
-  navigator.mediaSession.setActionHandler('enterpictureinpicture', async () => {
-    if (isPipSupported && pipActiveRef.current) {
-      try {
-        // @ts-expect-error untyped
-        const pipWindow = await documentPictureInPicture.requestWindow({
-          height: 270,
-          width: 480,
-          preferInitialWindowPlacement: true,
-        });
+  React.useEffect(() => {
+    const handler = async () => {
+      if (isPipSupported && pipActiveRef.current && hasMediaRef.current && document.hidden) {
+        try {
+          // @ts-expect-error This web API may not be supported by major browsers.
+          const pipWindow = await documentPictureInPicture.requestWindow({
+            height: 270,
+            width: 480,
+            preferInitialWindowPlacement: true,
+          });
 
-        const pipDiv = pipWindow.document.createElement('div');
-        pipDiv.setAttribute('id', 'pip-root');
-        pipWindow.document.body.append(pipDiv);
-        const PIP_ROOT = ReactDOM.createRoot(pipWindow.document.getElementById('pip-root'));
+          pipWindowRef.current = pipWindow;
 
-        const handlePageHide = () => {
-          PIP_ROOT.unmount();
-          window.focus();
-        };
+          const pipDiv = pipWindow.document.createElement('div');
+          pipDiv.setAttribute('id', 'pip-root');
+          pipWindow.document.body.append(pipDiv);
+          const pipRoot = ReactDOM.createRoot(pipWindow.document.getElementById('pip-root'));
+          pipRootRef.current = pipRoot;
 
-        pipWindow.addEventListener('pagehide', handlePageHide);
+          const handlePageHide = () => {
+            pipRoot.unmount();
+            window.focus();
+          };
 
-        const style = document.createElement('style');
-        style.textContent = cssRules.toString();
-        pipWindow.document.head.appendChild(style);
+          pipWindow.addEventListener('pagehide', handlePageHide);
 
-        const normalize = document.createElement('link');
-        normalize.rel = 'stylesheet';
-        normalize.type = 'text/css';
-        normalize.href = 'stylesheets/normalize.css';
-        pipWindow.document.head.appendChild(normalize);
+          const style = document.createElement('style');
+          style.textContent = cssRules.toString();
+          pipWindow.document.head.appendChild(style);
 
-        const icons = document.createElement('link');
-        icons.rel = 'stylesheet';
-        icons.type = 'text/css';
-        icons.href = 'stylesheets/bbb-icons.css';
-        pipWindow.document.head.appendChild(icons);
+          const normalize = document.createElement('link');
+          normalize.rel = 'stylesheet';
+          normalize.type = 'text/css';
+          normalize.href = 'stylesheets/normalize.css';
+          pipWindow.document.head.appendChild(normalize);
 
-        const fonts = document.createElement('link');
-        fonts.rel = 'stylesheet';
-        fonts.type = 'text/css';
-        fonts.href = 'stylesheets/bbb-icons.css';
-        pipWindow.document.head.appendChild(fonts);
+          const icons = document.createElement('link');
+          icons.rel = 'stylesheet';
+          icons.type = 'text/css';
+          icons.href = 'stylesheets/bbb-icons.css';
+          pipWindow.document.head.appendChild(icons);
 
-        PIP_ROOT.render(<Pip pluginUuid={pluginUuid} pipWindow={pipWindow} />);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error(error);
+          const fonts = document.createElement('link');
+          fonts.rel = 'stylesheet';
+          fonts.type = 'text/css';
+          fonts.href = 'stylesheets/bbb-icons.css';
+          pipWindow.document.head.appendChild(fonts);
+
+          pipRoot.render(
+            <Pip
+              pluginApi={pluginApi}
+              pipWindow={pipWindow}
+            />,
+          );
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(error);
+        }
+      } else if (!document.hidden) {
+        pipRootRef.current?.unmount();
+        pipWindowRef.current?.close();
       }
-    }
-  });
+    };
+
+    document.addEventListener('visibilitychange', handler);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handler);
+    };
+  }, []);
 
   return null;
 }
