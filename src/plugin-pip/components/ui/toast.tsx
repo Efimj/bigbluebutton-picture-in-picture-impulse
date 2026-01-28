@@ -1,4 +1,12 @@
 import * as React from 'react';
+import { IntlShape, defineMessages } from 'react-intl';
+
+const intlMessages = defineMessages({
+  toastClose: {
+    id: 'plugin.toast.close',
+    defaultMessage: 'Close notification',
+  },
+});
 
 export type ToastType = 'default' | 'success' | 'error' | 'warning' | 'info';
 
@@ -26,19 +34,22 @@ const ToastContext = React.createContext<ToastContextValue | undefined>(undefine
 
 interface ToastProviderProps {
   children: React.ReactNode;
+  intl: IntlShape;
 }
 
 interface ToastItemProps {
+  intl: IntlShape;
   toast: Toast;
   onClose: (id: string) => void;
 }
 
 interface ToastContainerProps {
+  intl: IntlShape;
   toasts: Toast[];
   onClose: (id: string) => void;
 }
 
-function ToastItem({ toast, onClose }: ToastItemProps) {
+function ToastItem({ intl, toast, onClose }: ToastItemProps) {
   const [isVisible, setIsVisible] = React.useState(false);
   const [isLeaving, setIsLeaving] = React.useState(false);
   const [isHovering, setIsHovering] = React.useState(false);
@@ -154,7 +165,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
           onMouseEnter={() => setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
           style={closeButtonStyles}
-          aria-label="Close notification"
+          aria-label={intl.formatMessage(intlMessages.toastClose)}
         >
           ×
         </button>
@@ -163,7 +174,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
   );
 }
 
-function ToastContainer({ toasts, onClose }: ToastContainerProps) {
+function ToastContainer({ toasts, onClose, intl }: ToastContainerProps) {
   const containerStyles: React.CSSProperties = {
     position: 'fixed',
     top: '20px',
@@ -181,13 +192,13 @@ function ToastContainer({ toasts, onClose }: ToastContainerProps) {
   return (
     <div style={containerStyles}>
       {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onClose={onClose} />
+        <ToastItem key={toast.id} toast={toast} onClose={onClose} intl={intl} />
       ))}
     </div>
   );
 }
 
-export function ToastProvider({ children }: ToastProviderProps) {
+export function ToastProvider({ children, intl }: ToastProviderProps) {
   const [toasts, setToasts] = React.useState<Toast[]>([]);
 
   const hideToast = React.useCallback((id: string) => {
@@ -234,7 +245,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <ToastContainer toasts={toasts} onClose={hideToast} />
+      <ToastContainer toasts={toasts} onClose={hideToast} intl={intl} />
     </ToastContext.Provider>
   );
 }

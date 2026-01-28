@@ -1,11 +1,40 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { defineMessages, IntlShape } from 'react-intl';
 import { RAISED_HAND_USERS, RaisedHandUserSubscriptionResponse } from './queries';
 import { SET_RAISE_HAND } from './mutations';
 import { useToast } from '../ui/toast';
 import { Modal, ModalButton } from '../ui/modal';
 
+export const intlMessages = defineMessages({
+  commonCancel: {
+    id: 'plugin.common.cancel',
+    defaultMessage: 'Cancel',
+  },
+  commonConfirm: {
+    id: 'plugin.common.confirm',
+    defaultMessage: 'Confirm',
+  },
+  raisedHandsStatus: {
+    id: 'plugin.raisedHands.status',
+    defaultMessage: 'raised hand',
+  },
+  raisedHandsLowerHand: {
+    id: 'plugin.raisedHands.lowerHand',
+    defaultMessage: "Lower User's Hand",
+  },
+  raisedHandsModalTitle: {
+    id: 'plugin.raisedHands.modal.title',
+    defaultMessage: 'Lower Hand',
+  },
+  raisedHandsModalConfirm: {
+    id: 'plugin.raisedHands.modal.confirm',
+    defaultMessage: "Are you sure you want to lower {name}'s hand?",
+  },
+});
+
 interface RaisedHandNotifierProps {
+  intl: IntlShape;
   pluginApi: PluginApi;
 }
 
@@ -44,12 +73,11 @@ interface RaisedHandContentProps {
     raiseHandTime: string;
     userId: string;
   };
-  lowerUserHands: (userId: string) => void;
+  lowerUserHands: (userId: string, userName: string) => void;
+  intl: IntlShape;
 }
 
-function RaisedHandContent({ user, lowerUserHands }: RaisedHandContentProps) {
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
-
+function RaisedHandContent({ intl, user, lowerUserHands }: RaisedHandContentProps) {
   const headerStyles: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -83,65 +111,38 @@ function RaisedHandContent({ user, lowerUserHands }: RaisedHandContentProps) {
     width: '100%',
   };
 
-  const handleConfirmLowerHand = () => {
-    lowerUserHands(user.userId);
-    setIsModalOpen(false);
-  };
-
   return (
-    <>
-      <div>
-        <div style={headerStyles}>
-          <UserAvatar name={user.name} color={user.color} isModerator={user.isModerator} />
-          <div style={textContainerStyles}>
-            <span style={nameStyles}>{user.name}</span>
-            &nbsp;
-            <span>raised hand</span>
-          </div>
+    <div>
+      <div style={headerStyles}>
+        <UserAvatar name={user.name} color={user.color} isModerator={user.isModerator} />
+        <div style={textContainerStyles}>
+          <span style={nameStyles}>{user.name}</span>
+          &nbsp;
+          <span>{intl.formatMessage(intlMessages.raisedHandsStatus)}</span>
         </div>
-        <button
-          style={lowerHandButtonStyles}
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-        >
-          Lower User&apos;s Hand
-        </button>
       </div>
-
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Lower Hand"
-        size="sm"
-        footer={(
-          <>
-            <ModalButton variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </ModalButton>
-            <ModalButton variant="danger" onClick={handleConfirmLowerHand}>
-              Confirm
-            </ModalButton>
-          </>
-        )}
+      <button
+        style={lowerHandButtonStyles}
+        type="button"
+        onClick={() => lowerUserHands(user.userId, user.name)}
       >
-        <p style={{ margin: 0 }}>
-          Are you sure you want to lower
-          {' '}
-          {user.name}
-          &apos;s hand?
-        </p>
-      </Modal>
-    </>
+        {intl.formatMessage(intlMessages.raisedHandsLowerHand)}
+      </button>
+    </div>
   );
 }
 
-function RaisedHandNotifier({ pluginApi }: RaisedHandNotifierProps): React.ReactNode {
+function RaisedHandNotifier({ intl, pluginApi }: RaisedHandNotifierProps): React.ReactNode {
   const {
     data: raisedHandUsersData,
   } = pluginApi.useCustomSubscription!<RaisedHandUserSubscriptionResponse>(RAISED_HAND_USERS);
   const raisedHands = raisedHandUsersData?.user ?? [];
   const { showToast, hideToast, toasts } = useToast();
   const previousRaisedHandsRef = React.useRef<Set<string>>(new Set());
+  const [
+    userToLowerHand,
+    setUserToLowerHand,
+  ] = React.useState<{ userId: string; userName: string } | null>(null);
 
   const [setRaiseHand] = pluginApi.useCustomMutation<{
     userId: string;
@@ -178,7 +179,11 @@ function RaisedHandNotifier({ pluginApi }: RaisedHandNotifierProps): React.React
     // Show toasts for new raised hands
     newRaisedHands.forEach((user) => {
       showToast(
-        <RaisedHandContent user={user} lowerUserHands={lowerUserHands} />,
+        <RaisedHandContent
+          intl={intl}
+          user={user}
+          lowerUserHands={(userId, userName) => setUserToLowerHand({ userId, userName })}
+        />,
         'default',
         10000, // 10 seconds duration
         true, // Dismissible by user
@@ -195,11 +200,40 @@ function RaisedHandNotifier({ pluginApi }: RaisedHandNotifierProps): React.React
       }
     });
 
-    // Update the ref
     previousRaisedHandsRef.current = currentRaisedHandIds;
   }, [raisedHands, showToast, hideToast, toasts]);
 
-  return null;
+  const handleConfirmLowerHand = () => {
+    lowerUserHands(userToLowerHand.userId);
+    setUserToLowerHand(null);
+  };
+
+  return (
+    <Modal
+      intl={intl}
+      isOpen={userToLowerHand !== null}
+      onClose={() => setUserToLowerHand(null)}
+      title={intl.formatMessage(intlMessages.raisedHandsModalTitle)}
+      size="sm"
+      footer={(
+        <>
+          <ModalButton variant="secondary" onClick={() => setUserToLowerHand(null)}>
+            {intl.formatMessage(intlMessages.commonCancel)}
+          </ModalButton>
+          <ModalButton variant="danger" onClick={handleConfirmLowerHand}>
+            {intl.formatMessage(intlMessages.commonConfirm)}
+          </ModalButton>
+        </>
+      )}
+    >
+      <p style={{ margin: 0 }}>
+        {intl.formatMessage(
+          intlMessages.raisedHandsModalConfirm,
+          { name: userToLowerHand?.userName },
+        )}
+      </p>
+    </Modal>
+  );
 }
 
 export default RaisedHandNotifier;

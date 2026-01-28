@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { IntlShape } from 'react-intl';
 import AudioButtonComponent from './buttons/audio/component';
 import WebcamButtonComponent from './buttons/webcam/component';
 import UnreadChatButtonComponent from './buttons/unread-chat/component';
@@ -8,11 +9,12 @@ import UsersBadgeComponent from './buttons/users/component';
 import { useLayoutContext } from '../contexts/layout';
 
 interface ActionsComponentProps {
+  intl: IntlShape;
   pluginApi: PluginApi;
   pipWindow: Window;
 }
 
-function ActionsComponent({ pluginApi, pipWindow }: ActionsComponentProps): React.ReactNode {
+function ActionsComponent({ intl, pluginApi, pipWindow }: ActionsComponentProps): React.ReactNode {
   const { actions } = useLayoutContext();
   return (
     <div
@@ -26,10 +28,10 @@ function ActionsComponent({ pluginApi, pipWindow }: ActionsComponentProps): Reac
       }}
     >
       <div className="controls">
-        <AudioButtonComponent pluginApi={pluginApi} />
-        <WebcamButtonComponent pluginApi={pluginApi} />
-        <UnreadChatButtonComponent pluginApi={pluginApi} pipWindow={pipWindow} />
-        <RaisedHandsButtonComponent pluginApi={pluginApi} pipWindow={pipWindow} />
+        <AudioButtonComponent intl={intl} pluginApi={pluginApi} />
+        <WebcamButtonComponent intl={intl} pluginApi={pluginApi} />
+        <UnreadChatButtonComponent intl={intl} pluginApi={pluginApi} pipWindow={pipWindow} />
+        <RaisedHandsButtonComponent intl={intl} pluginApi={pluginApi} pipWindow={pipWindow} />
         <div
           style={{
             width: '1px',
@@ -40,7 +42,7 @@ function ActionsComponent({ pluginApi, pipWindow }: ActionsComponentProps): Reac
             borderRadius: '6px',
           }}
         />
-        <UsersBadgeComponent pluginApi={pluginApi} />
+        <UsersBadgeComponent intl={intl} pluginApi={pluginApi} />
       </div>
     </div>
   );

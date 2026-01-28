@@ -1,8 +1,17 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
+import { defineMessages, IntlShape } from 'react-intl';
 import { usePipWindow } from '../contexts/pip-window';
 
+const intlMessages = defineMessages({
+  modalClose: {
+    id: 'plugin.modal.close',
+    defaultMessage: 'Close modal',
+  },
+});
+
 interface ModalProps {
+  intl: IntlShape;
   isOpen: boolean;
   onClose: () => void;
   title?: string;
@@ -15,6 +24,7 @@ interface ModalProps {
 }
 
 export function Modal({
+  intl,
   isOpen,
   onClose,
   title,
@@ -198,7 +208,7 @@ export function Modal({
           <button
             onClick={onClose}
             style={closeButtonStyle}
-            aria-label="Close modal"
+            aria-label={intl.formatMessage(intlMessages.modalClose)}
             type="button"
           >
             ×

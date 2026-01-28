@@ -1,11 +1,13 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { ActionButtonDropdownOption, BbbPluginSdk, FloatingWindow } from 'bigbluebutton-html-plugin-sdk';
+import { defineMessages } from 'react-intl';
 import { css } from 'styled-components';
 import Pip from '../plugin-pip/component';
 import { useVideoStreams } from '../plugin-pip/components/cameras/hooks';
 import { useScreenshare } from '../plugin-pip/components/screenshare/hooks';
 import FocusWarning from '../plugin-pip/components/warning/component';
+import { useI18n } from '../common/hooks';
 
 const isPipSupported = 'documentPictureInPicture' in window;
 
@@ -243,6 +245,17 @@ const cssRules = css`
   }
 `;
 
+export const intlMessages = defineMessages({
+  activate: {
+    id: 'plugin.pip.activate',
+    defaultMessage: 'Activate PiP Window',
+  },
+  deactivate: {
+    id: 'plugin.pip.deactivate',
+    defaultMessage: 'Deactivate PiP Window',
+  },
+});
+
 interface MainComponentProps {
   pluginUuid: string;
 }
@@ -250,6 +263,7 @@ interface MainComponentProps {
 function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
+  const { intl } = useI18n(pluginApi);
   const pipActiveRef = React.useRef(JSON.parse(localStorage.getItem('pip-plugin-active')));
   const pipWindowRef = React.useRef<Window | null>(null);
   const pipRootRef = React.useRef<ReactDOM.Root | null>(null);
@@ -264,24 +278,28 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   hasMediaRef.current = hasMedia;
 
   if (isPipSupported) {
+    const activateLabel = intl?.formatMessage(intlMessages.activate) || 'Activate PiP Window';
+    const deactivateLabel = intl?.formatMessage(intlMessages.deactivate) || 'Deactivate PiP Window';
     pluginApi.setActionButtonDropdownItems([
       new ActionButtonDropdownOption({
         allowed: true,
         icon: pipActive ? 'desktop_off' : 'desktop',
-        label: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
+        label: pipActive ? deactivateLabel : activateLabel,
         onClick: () => {
           pipActiveRef.current = !pipActiveRef.current;
           localStorage.setItem('pip-plugin-active', JSON.stringify(pipActiveRef.current));
           setPipActive(pipActiveRef.current);
         },
-        tooltip: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
+        tooltip: pipActive ? deactivateLabel : activateLabel,
       }),
     ]);
   }
 
   React.useEffect(() => {
+    if (!isPipSupported) return undefined;
+
     const handler = async () => {
-      if (isPipSupported && pipActiveRef.current && hasMediaRef.current && document.hidden) {
+      if (intl && pipActiveRef.current && hasMediaRef.current && document.hidden) {
         try {
           // @ts-expect-error This web API may not be supported by all major browsers.
           const pipWindow = await documentPictureInPicture.requestWindow({
@@ -331,6 +349,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
             <Pip
               pluginApi={pluginApi}
               pipWindow={pipWindow}
+              intl={intl}
             />,
           );
         } catch (error) {
@@ -348,7 +367,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     return () => {
       document.removeEventListener('visibilitychange', handler);
     };
-  }, []);
+  }, [intl, pluginApi]);
 
   React.useEffect(() => {
     if (!isPipSupported || !pipActive) return undefined;
@@ -378,7 +397,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       const rect = actionsButton.getBoundingClientRect();
       pluginApi.setFloatingWindows([
         new FloatingWindow({
-          id: 'focus-warning',
+          id: 'plugin-pip-focus-warning',
           top: rect.top - 90,
           left: rect.left + (rect.width / 2) - 181,
           movable: true,
@@ -386,7 +405,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           boxShadow: 'none',
           contentFunction: (element: HTMLElement) => {
             const root = ReactDOM.createRoot(element);
-            root.render(<FocusWarning />);
+            root.render(<FocusWarning intl={intl} />);
             return root;
           },
         }),

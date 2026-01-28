@@ -2,5 +2,6 @@
   "requiredSdkVersion": "~0.0.95",
   "name": "PluginPictureInPicture",
   "javascriptEntrypointUrl": "PluginPictureInPicture.js",
-  "version": "0.0.3"
+  "version": "0.0.3",
+  "localesBaseUrl": "locales"
 }
