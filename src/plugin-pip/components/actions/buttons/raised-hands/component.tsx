@@ -12,9 +12,13 @@ const intlMessages = defineMessages({
     id: 'plugin.raisedHands.tooltip.none',
     defaultMessage: 'No raised hand',
   },
-  raisedHandsTooltipCount: {
-    id: 'plugin.raisedHands.tooltip.count',
+  raisedHandsTooltipCountPlural: {
+    id: 'plugin.raisedHands.tooltip.count.plural',
     defaultMessage: '{count} raised hands',
+  },
+  raisedHandsTooltipCountSingular: {
+    id: 'plugin.raisedHands.tooltip.count.singular',
+    defaultMessage: '{count} raised hand',
   },
   commonCancel: {
     id: 'plugin.common.cancel',
@@ -310,9 +314,21 @@ function RaisedHandsButtonComponent(
     />
   );
 
-  const tooltipMessage = raisedHandCount > 0
-    ? intl.formatMessage(intlMessages.raisedHandsTooltipCount, { count: raisedHandCount })
-    : intl.formatMessage(intlMessages.raisedHandsTooltipNone);
+  const tooltipMessage = (() => {
+    if (raisedHandCount > 1) {
+      return intl.formatMessage(
+        intlMessages.raisedHandsTooltipCountPlural,
+        { count: raisedHandCount },
+      );
+    }
+    if (raisedHandCount === 1) {
+      return intl.formatMessage(
+        intlMessages.raisedHandsTooltipCountSingular,
+        { count: 1 },
+      );
+    }
+    return intl.formatMessage(intlMessages.raisedHandsTooltipNone);
+  })();
 
   if (noRaisedHand) {
     return (
