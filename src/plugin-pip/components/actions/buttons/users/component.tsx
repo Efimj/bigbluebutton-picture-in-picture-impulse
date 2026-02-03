@@ -1,20 +1,39 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { defineMessages, IntlShape } from 'react-intl';
 import { USER_AGGREGATE_COUNT_SUBSCRIPTION, UsersCountSubscriptionResponse } from './queries';
 import Tooltip from '../../../ui/tooltip';
 
+const intlMessages = defineMessages({
+  usersTooltipSingular: {
+    id: 'plugin.users.tooltip.singular',
+    defaultMessage: '{count} user in the session',
+  },
+  usersTooltipPlural: {
+    id: 'plugin.users.tooltip.plural',
+    defaultMessage: '{count} users in the session',
+  },
+});
+
 interface UsersBadgeComponentProps {
+  intl: IntlShape;
   pluginApi: PluginApi;
 }
 
-function UsersBadgeComponent({ pluginApi }: UsersBadgeComponentProps): React.ReactNode {
+function UsersBadgeComponent({ intl, pluginApi }: UsersBadgeComponentProps): React.ReactNode {
   const { data } = pluginApi.useCustomSubscription!<UsersCountSubscriptionResponse>(
     USER_AGGREGATE_COUNT_SUBSCRIPTION,
   );
   const numOfUsers = data?.user_aggregate?.aggregate?.count ?? 0;
 
+  const tooltipMessage = numOfUsers === 1
+    ? intlMessages.usersTooltipSingular
+    : intlMessages.usersTooltipPlural;
+
+  const tooltipLabel = intl.formatMessage(tooltipMessage, { count: numOfUsers });
+
   return (
-    <Tooltip content={`${numOfUsers} user${numOfUsers !== 1 ? 's' : ''} in the meeting`}>
+    <Tooltip content={tooltipLabel}>
       {({ styles, children, ...props }) => (
         <button
           {...props}
@@ -35,6 +54,7 @@ function UsersBadgeComponent({ pluginApi }: UsersBadgeComponentProps): React.Rea
             border: 'none',
           }}
         >
+          <span className="sr-only">{tooltipLabel}</span>
           <i className="icon-bbb-user" />
           <span>{numOfUsers}</span>
           {children}

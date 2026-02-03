@@ -1,12 +1,69 @@
 import * as React from 'react';
-import { CurrentUserData, PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { PluginApi, CurrentUserData } from 'bigbluebutton-html-plugin-sdk';
+import { defineMessages, IntlShape } from 'react-intl';
 import Tooltip from '../../../ui/tooltip';
 import { RAISED_HAND_USERS, RaisedHandUsersSubscriptionResponse, RaisedHandUser } from './queries';
 import Popover from '../../../ui/popover';
 import { SET_RAISE_HAND } from '../../../raised-hands/mutations';
 import { Modal, ModalButton } from '../../../ui/modal';
 
+const intlMessages = defineMessages({
+  raisedHandsTooltipNone: {
+    id: 'plugin.raisedHands.tooltip.none',
+    defaultMessage: 'No raised hand',
+  },
+  raisedHandsTooltipCountPlural: {
+    id: 'plugin.raisedHands.tooltip.count.plural',
+    defaultMessage: '{count} raised hands',
+  },
+  raisedHandsTooltipCountSingular: {
+    id: 'plugin.raisedHands.tooltip.count.singular',
+    defaultMessage: '{count} raised hand',
+  },
+  commonCancel: {
+    id: 'plugin.common.cancel',
+    defaultMessage: 'Cancel',
+  },
+  commonConfirm: {
+    id: 'plugin.common.confirm',
+    defaultMessage: 'Confirm',
+  },
+  raisedHandsStatus: {
+    id: 'plugin.raisedHands.status',
+    defaultMessage: 'raised hand',
+  },
+  raisedHandsLowerHand: {
+    id: 'plugin.raisedHands.lowerHand',
+    defaultMessage: "Lower User's Hand",
+  },
+  raisedHandsModalTitle: {
+    id: 'plugin.raisedHands.modal.title',
+    defaultMessage: 'Lower Hand',
+  },
+  raisedHandsModalConfirm: {
+    id: 'plugin.raisedHands.modal.confirm',
+    defaultMessage: "Are you sure you want to lower {name}'s hand?",
+  },
+  raisedHandsModalConfirmCurrent: {
+    id: 'plugin.raisedHands.modal.confirmCurrent',
+    defaultMessage: 'Are you sure you want to lower your hand?',
+  },
+  raisedHandsDropdownTitle: {
+    id: 'plugin.raisedHands.dropdown.title',
+    defaultMessage: 'Raised Hands ({count})',
+  },
+  raisedHandsDropdownYou: {
+    id: 'plugin.raisedHands.dropdown.you',
+    defaultMessage: 'you',
+  },
+  raisedHandsDropdownLower: {
+    id: 'plugin.raisedHands.dropdown.lower',
+    defaultMessage: 'Lower',
+  },
+});
+
 interface RaisedHandsButtonComponentProps {
+  intl: IntlShape;
   pluginApi: PluginApi;
 }
 
@@ -73,10 +130,11 @@ interface RaisedHandUserItemProps {
   onLowerHand: (userId: string) => void;
   canLower: boolean;
   current: boolean;
+  intl: IntlShape;
 }
 
 function RaisedHandUserItem({
-  user, position, onLowerHand, canLower, current,
+  user, position, onLowerHand, canLower, current, intl,
 }: RaisedHandUserItemProps) {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
 
@@ -122,14 +180,14 @@ function RaisedHandUserItem({
           isModerator={user.isModerator}
           position={position}
         />
-        <span style={nameStyles}>{`${user.name} ${current ? '(you)' : ''}`}</span>
+        <span style={nameStyles}>{`${user.name} ${current ? `(${intl.formatMessage(intlMessages.raisedHandsDropdownYou)})` : ''}`}</span>
         {canLower && (
           <button
             style={lowerHandButtonStyles}
             type="button"
             onClick={() => setIsModalOpen(true)}
           >
-            Lower
+            {intl.formatMessage(intlMessages.raisedHandsDropdownLower)}
           </button>
         )}
       </div>
@@ -137,30 +195,31 @@ function RaisedHandUserItem({
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Lower Hand"
+        title={intl.formatMessage(intlMessages.raisedHandsModalTitle)}
         size="sm"
         renderInPortal={false}
+        intl={intl}
         footer={(
           <>
             <ModalButton variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {intl.formatMessage(intlMessages.commonCancel)}
             </ModalButton>
             <ModalButton variant="danger" onClick={handleConfirmLowerHand}>
-              Confirm
+              {intl.formatMessage(intlMessages.commonConfirm)}
             </ModalButton>
           </>
         )}
       >
         {current ? (
           <p style={{ margin: 0 }}>
-            Are you sure you want to lower your hand
+            {intl.formatMessage(intlMessages.raisedHandsModalConfirmCurrent)}
           </p>
         ) : (
           <p style={{ margin: 0 }}>
-            Are you sure you want to lower
-            {' '}
-            {user.name}
-            &apos;s hand?
+            {intl.formatMessage(
+              intlMessages.raisedHandsModalConfirm,
+              { name: user.name },
+            )}
           </p>
         )}
       </Modal>
@@ -172,9 +231,12 @@ interface RaisedHandsListProps {
   users: RaisedHandUser[];
   onLowerHand: (userId: string) => void;
   currentUser: CurrentUserData;
+  intl: IntlShape;
 }
 
-function RaisedHandsList({ users, onLowerHand, currentUser }: RaisedHandsListProps) {
+function RaisedHandsList({
+  users, onLowerHand, currentUser, intl,
+}: RaisedHandsListProps) {
   const containerStyles: React.CSSProperties = {
     minWidth: '200px',
     maxHeight: '70vh',
@@ -199,9 +261,7 @@ function RaisedHandsList({ users, onLowerHand, currentUser }: RaisedHandsListPro
   return (
     <div style={containerStyles}>
       <div style={headerStyles}>
-        Raised Hands (
-        {users.length}
-        )
+        {intl.formatMessage(intlMessages.raisedHandsDropdownTitle, { count: users.length })}
       </div>
       <div style={listStyles}>
         {users.map((user, index) => (
@@ -212,6 +272,7 @@ function RaisedHandsList({ users, onLowerHand, currentUser }: RaisedHandsListPro
             onLowerHand={onLowerHand}
             canLower={currentUser?.presenter || currentUser?.role === 'MODERATOR' || user.userId === currentUser?.userId}
             current={user.userId === currentUser?.userId}
+            intl={intl}
           />
         ))}
       </div>
@@ -220,7 +281,7 @@ function RaisedHandsList({ users, onLowerHand, currentUser }: RaisedHandsListPro
 }
 
 function RaisedHandsButtonComponent(
-  { pluginApi }: RaisedHandsButtonComponentProps,
+  { intl, pluginApi }: RaisedHandsButtonComponentProps,
 ): React.ReactNode {
   const {
     data: raisedHandUsers,
@@ -245,18 +306,42 @@ function RaisedHandsButtonComponent(
   };
 
   const popoverContent = (
-    <RaisedHandsList users={users} onLowerHand={lowerUserHand} currentUser={currentUser} />
+    <RaisedHandsList
+      intl={intl}
+      users={users}
+      onLowerHand={lowerUserHand}
+      currentUser={currentUser}
+    />
   );
+
+  const tooltipMessage = (() => {
+    if (raisedHandCount > 1) {
+      return intl.formatMessage(
+        intlMessages.raisedHandsTooltipCountPlural,
+        { count: raisedHandCount },
+      );
+    }
+    if (raisedHandCount === 1) {
+      return intl.formatMessage(
+        intlMessages.raisedHandsTooltipCountSingular,
+        { count: 1 },
+      );
+    }
+    return intl.formatMessage(intlMessages.raisedHandsTooltipNone);
+  })();
 
   if (noRaisedHand) {
     return (
-      <Tooltip content="No raised hand">
+      <Tooltip content={tooltipMessage}>
         <button
           className="media-btn"
           type="button"
           disabled={noRaisedHand}
-          aria-label="No raised hand"
+          aria-label={tooltipMessage}
         >
+          <span className="sr-only">
+            {tooltipMessage}
+          </span>
           <i className="icon-bbb-hand" />
         </button>
       </Tooltip>
@@ -272,7 +357,7 @@ function RaisedHandsButtonComponent(
       {({
         disabled, onClick, ref,
       }) => (
-        <Tooltip content={`${raisedHandCount} raised hands`}>
+        <Tooltip content={tooltipMessage}>
           {({
             children, styles, onBlur, onFocus, onMouseEnter, onMouseLeave,
           }) => (
@@ -290,6 +375,9 @@ function RaisedHandsButtonComponent(
                 onFocus,
               }}
             >
+              <span className="sr-only">
+                {tooltipMessage}
+              </span>
               <i className="icon-bbb-hand" />
               <div className="badge">
                 <span>

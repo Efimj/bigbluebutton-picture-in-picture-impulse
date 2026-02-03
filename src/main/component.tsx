@@ -1,6 +1,8 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { ActionButtonDropdownOption, BbbPluginSdk, FloatingWindow } from 'bigbluebutton-html-plugin-sdk';
+import { defineMessages } from 'react-intl';
+import { useI18n } from '../common/hooks';
 import Pip from '../plugin-pip/component';
 import { useVideoStreams } from '../plugin-pip/components/cameras/hooks';
 import { useScreenshare } from '../plugin-pip/components/screenshare/hooks';
@@ -10,6 +12,17 @@ import styles from './stylesheet';
 
 const isPipSupported = 'documentPictureInPicture' in window;
 
+const intlMessages = defineMessages({
+  activate: {
+    id: 'plugin.pip.activate',
+    defaultMessage: 'Activate PiP Window',
+  },
+  deactivate: {
+    id: 'plugin.pip.deactivate',
+    defaultMessage: 'Deactivate PiP Window',
+  },
+});
+
 interface MainComponentProps {
   pluginUuid: string;
 }
@@ -17,6 +30,7 @@ interface MainComponentProps {
 function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
+  const { intl } = useI18n(pluginApi);
   const pipActiveRef = React.useRef(JSON.parse(localStorage.getItem('pip-plugin-active')));
   const pipWindowRef = React.useRef<Window | null>(null);
   const hasMediaRef = React.useRef(false);
@@ -33,17 +47,19 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   const amISharingWebcam = Boolean(currentUser?.cameras?.length);
 
   if (isPipSupported) {
+    const activateLabel = intl?.formatMessage(intlMessages.activate) || 'Activate PiP Window';
+    const deactivateLabel = intl?.formatMessage(intlMessages.deactivate) || 'Deactivate PiP Window';
     pluginApi.setActionButtonDropdownItems([
       new ActionButtonDropdownOption({
         allowed: true,
         icon: pipActive ? 'desktop_off' : 'desktop',
-        label: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
+        label: pipActive ? deactivateLabel : activateLabel,
         onClick: () => {
           pipActiveRef.current = !pipActiveRef.current;
           localStorage.setItem('pip-plugin-active', JSON.stringify(pipActiveRef.current));
           setPipActive(pipActiveRef.current);
         },
-        tooltip: pipActive ? 'Deactivate PiP Window' : 'Activate PiP Window',
+        tooltip: pipActive ? deactivateLabel : activateLabel,
       }),
     ]);
   }
@@ -101,6 +117,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           <Pip
             pluginApi={pluginApi}
             pipWindow={pipWindow}
+            intl={intl}
           />,
         );
 
@@ -135,7 +152,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       // @ts-expect-error This media action may not be supported by all major browsers.
       navigator.mediaSession.setActionHandler('enterpictureinpicture', null);
     };
-  }, []);
+  }, [intl, pluginApi]);
 
   React.useEffect(() => {
     if (!isPipSupported || !pipActive) return undefined;
@@ -165,7 +182,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       const rect = actionsButton.getBoundingClientRect();
       pluginApi.setFloatingWindows([
         new FloatingWindow({
-          id: 'focus-warning',
+          id: 'plugin-pip-focus-warning',
           top: rect.top - 90,
           left: rect.left + (rect.width / 2) - 181,
           movable: true,
@@ -173,7 +190,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           boxShadow: 'none',
           contentFunction: (element: HTMLElement) => {
             const root = ReactDOM.createRoot(element);
-            root.render(<FocusWarning />);
+            root.render(<FocusWarning intl={intl} />);
             return root;
           },
         }),

@@ -1,16 +1,29 @@
 import * as React from 'react';
+import { defineMessages, IntlShape } from 'react-intl';
 import Tooltip from '../../../ui/tooltip';
 import { useLayoutContext } from '../../../contexts/layout';
 
-function LayoutButtonComponent() {
+export const intlMessages = defineMessages({
+  layoutSwap: {
+    id: 'plugin.layout.button.swap',
+    defaultMessage: 'Swap layout',
+  },
+});
+
+interface LayoutButtonComponentProps {
+  intl: IntlShape;
+}
+
+function LayoutButtonComponent({ intl }: LayoutButtonComponentProps) {
   const { swap, canSwap } = useLayoutContext();
 
   if (!canSwap) return null;
 
   const className = ['media-btn'];
+  const label = intl.formatMessage(intlMessages.layoutSwap);
 
   return (
-    <Tooltip content="Swap layout">
+    <Tooltip content={label}>
       {({ children, styles, ...props }) => (
         <button
           {...props}
@@ -20,7 +33,7 @@ function LayoutButtonComponent() {
           style={styles}
         >
           <span className="sr-only">
-            Swap layout
+            {label}
           </span>
           <i className="icon-bbb-refresh" />
           {children}

@@ -1,13 +1,38 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { IntlShape, defineMessages } from 'react-intl';
 import Tooltip from '../../../ui/tooltip';
 import { useCurrentUserVoice, useToggleVoice } from '../../hooks';
 
+export const intlMessages = defineMessages({
+  audioTooltipNoAudio: {
+    id: 'plugin.audio.tooltip.noAudio',
+    defaultMessage: 'No audio',
+  },
+  audioTooltipUnmute: {
+    id: 'plugin.audio.tooltip.unmute',
+    defaultMessage: 'Unmute',
+  },
+  audioTooltipMute: {
+    id: 'plugin.audio.tooltip.mute',
+    defaultMessage: 'Mute',
+  },
+  audioSrOnlyUnmute: {
+    id: 'plugin.audio.srOnly.unmute',
+    defaultMessage: 'Unmute Me',
+  },
+  audioSrOnlyMute: {
+    id: 'plugin.audio.srOnly.mute',
+    defaultMessage: 'Mute Me',
+  },
+});
+
 interface AudioButtonComponentProps {
+  intl: IntlShape;
   pluginApi: PluginApi;
 }
 
-function AudioButtonComponent({ pluginApi }: AudioButtonComponentProps) {
+function AudioButtonComponent({ intl, pluginApi }: AudioButtonComponentProps) {
   const currentUser = pluginApi.useCurrentUser!();
   const currentUserVoice = useCurrentUserVoice(pluginApi);
 
@@ -25,11 +50,11 @@ function AudioButtonComponent({ pluginApi }: AudioButtonComponentProps) {
   let title;
 
   if (noAudio) {
-    title = 'No audio';
+    title = intl.formatMessage(intlMessages.audioTooltipNoAudio);
   } else if (currentUserVoice?.muted) {
-    title = 'Unmute';
+    title = intl.formatMessage(intlMessages.audioTooltipUnmute);
   } else {
-    title = 'Mute';
+    title = intl.formatMessage(intlMessages.audioTooltipMute);
   }
 
   return (
@@ -48,7 +73,9 @@ function AudioButtonComponent({ pluginApi }: AudioButtonComponentProps) {
           }}
         >
           <span className="sr-only">
-            {currentUserVoice?.muted ? 'Unmute Me' : 'Mute Me'}
+            {currentUserVoice?.muted
+              ? intl.formatMessage(intlMessages.audioSrOnlyUnmute)
+              : intl.formatMessage(intlMessages.audioSrOnlyMute)}
           </span>
           {noAudio ? (
             <i className="icon-bbb-no_audio" />

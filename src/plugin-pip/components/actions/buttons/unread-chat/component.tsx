@@ -1,15 +1,28 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { defineMessages, IntlShape } from 'react-intl';
 import Tooltip from '../../../ui/tooltip';
 import { PUBLIC_CHAT, PublicChatSubscriptionResult } from './queries';
 
+const intlMessages = defineMessages({
+  unreadChatTooltipNone: {
+    id: 'plugin.unreadChat.tooltip.none',
+    defaultMessage: 'No unread messages',
+  },
+  unreadChatTooltipCount: {
+    id: 'plugin.unreadChat.tooltip.count',
+    defaultMessage: '{count} unread messages',
+  },
+});
+
 interface UnreadChatButtonComponentProps {
+  intl: IntlShape;
   pluginApi: PluginApi;
   pipWindow: Window;
 }
 
 function UnreadChatButtonComponent(
-  { pluginApi, pipWindow }: UnreadChatButtonComponentProps,
+  { intl, pluginApi, pipWindow }: UnreadChatButtonComponentProps,
 ): React.ReactNode {
   const {
     data: publicChat,
@@ -17,8 +30,12 @@ function UnreadChatButtonComponent(
   const unreadCount = publicChat?.chat[0]?.totalUnread ?? 0;
   const disabled = unreadCount === 0;
 
+  const tooltipMessage = unreadCount > 0
+    ? intl.formatMessage(intlMessages.unreadChatTooltipCount, { count: unreadCount })
+    : intl.formatMessage(intlMessages.unreadChatTooltipNone);
+
   return (
-    <Tooltip content={unreadCount > 0 ? `${unreadCount} unread messages` : 'No unread messages'}>
+    <Tooltip content={tooltipMessage}>
       {({ children, styles, ...props }) => (
         <button
           {...props}
@@ -31,6 +48,9 @@ function UnreadChatButtonComponent(
             pipWindow.close();
           }}
         >
+          <span className="sr-only">
+            {tooltipMessage}
+          </span>
           <i className="icon-bbb-group_chat" />
           {!disabled && (
           <div className="badge">

@@ -1,17 +1,27 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { defineMessages, IntlShape } from 'react-intl';
 import { useToast } from '../ui/toast';
 import { CHAT_MESSAGE_STREAM, type ChatMessageStreamResponse, type Message } from './queries';
 
+const intlMessages = defineMessages({
+  unknownUser: {
+    id: 'plugin.chat.unknownUser',
+    defaultMessage: 'Unknown User',
+  },
+});
+
 interface ChatNotifierProps {
+  intl: IntlShape;
   pluginApi: PluginApi;
 }
 
 interface ChatMessageToastProps {
+  intl: IntlShape;
   message: Message;
 }
 
-function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElement {
+function ChatMessageToast({ intl, message }: ChatMessageToastProps): React.ReactElement {
   const getRoleColor = (role: string | null): string => {
     const roleColors: Record<string, string> = {
       MODERATOR: '#3b82f6',
@@ -79,18 +89,6 @@ function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElemen
     return name.substring(0, 2);
   };
 
-  const formatTime = (dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '';
-    }
-  };
-
   return (
     <div style={containerStyles}>
       <div style={headerStyles}>
@@ -98,11 +96,11 @@ function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElemen
           {getInitials(message.senderName)}
         </div>
         <div style={nameStyles}>
-          {message.senderName || 'Unknown User'}
+          {message.senderName || intl.formatMessage(intlMessages.unknownUser)}
         </div>
         {message.createdAt && (
           <div style={footerStyles}>
-            {formatTime(message.createdAt)}
+            {intl.formatTime(message.createdAt, { hour: '2-digit', minute: '2-digit', hourCycle: 'h24' })}
           </div>
         )}
       </div>
@@ -112,7 +110,7 @@ function ChatMessageToast({ message }: ChatMessageToastProps): React.ReactElemen
   );
 }
 
-function ChatNotifier({ pluginApi }: ChatNotifierProps): React.ReactNode {
+function ChatNotifier({ intl, pluginApi }: ChatNotifierProps): React.ReactNode {
   const cursor = React.useRef(new Date());
   const { showToast } = useToast();
   const {
@@ -129,7 +127,7 @@ function ChatNotifier({ pluginApi }: ChatNotifierProps): React.ReactNode {
   React.useEffect(() => {
     if (!chatMessageStream?.chat_message_stream) return;
     chatMessageStream.chat_message_stream.forEach((msg) => {
-      showToast(<ChatMessageToast message={msg} />, 'default', 10000);
+      showToast(<ChatMessageToast intl={intl} message={msg} />, 'default', 10000);
     });
   }, [chatMessageStream, showToast]);
 

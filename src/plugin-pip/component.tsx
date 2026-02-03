@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
+import { IntlShape } from 'react-intl';
 import CamerasComponent from './components/cameras/component';
 import ActionsComponent from './components/actions/component';
 import ScreenshareComponent from './components/screenshare/component';
@@ -12,11 +13,12 @@ import { PipWindowProvider } from './components/contexts/pip-window';
 import { LayoutProvider } from './components/contexts/layout';
 
 interface PluginPipProps {
+  intl: IntlShape
   pluginApi: PluginApi;
   pipWindow: Window;
 }
 
-function PluginPip({ pluginApi, pipWindow }: PluginPipProps): React.ReactNode {
+function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactNode {
   const { data: currentUser } = pluginApi.useCurrentUser();
   const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
@@ -39,16 +41,16 @@ function PluginPip({ pluginApi, pipWindow }: PluginPipProps): React.ReactNode {
         presenter={presenter}
         moderator={moderator}
       >
-        <ToastProvider>
+        <ToastProvider intl={intl}>
           <div className={containerClassName.join(' ')}>
             <div className="video">
               <ScreenshareComponent pluginApi={pluginApi} />
               <CamerasComponent pluginApi={pluginApi} />
             </div>
-            <ActionsComponent pluginApi={pluginApi} pipWindow={pipWindow} />
+            <ActionsComponent pluginApi={pluginApi} pipWindow={pipWindow} intl={intl} />
           </div>
-          <ChatNotifier pluginApi={pluginApi} />
-          {presenter && <RaisedHandNotifier pluginApi={pluginApi} />}
+          <ChatNotifier intl={intl} pluginApi={pluginApi} />
+          {presenter && <RaisedHandNotifier intl={intl} pluginApi={pluginApi} />}
           <div id="modals-root" style={{ zIndex: 9999 }} />
         </ToastProvider>
       </LayoutProvider>

@@ -1,6 +1,22 @@
 import * as React from 'react';
+import { defineMessages, IntlShape } from 'react-intl';
 
-function FocusWarning(): React.ReactNode {
+const intlMessages = defineMessages({
+  warningTitle: {
+    id: 'plugin.warning.title',
+    defaultMessage: 'Click anywhere in the document to reactivate focus.',
+  },
+  warningMessage: {
+    id: 'plugin.warning.message',
+    defaultMessage: 'This ensures that Picture-in-Picture will be automatically reactivated when you leave this tab again.',
+  },
+});
+
+interface FocusWarningProps {
+  intl: IntlShape;
+}
+
+function FocusWarning({ intl }: FocusWarningProps): React.ReactNode {
   const containerStyle: React.CSSProperties = {
     backgroundColor: '#303030',
     borderRadius: '10px',
@@ -37,11 +53,10 @@ function FocusWarning(): React.ReactNode {
       <div>
         <span style={iconStyle}>⚠</span>
         &nbsp;
-        <span style={titleStyle}>Click anywhere in the document to reactivate focus.</span>
+        <span style={titleStyle}>{intl.formatMessage(intlMessages.warningTitle)}</span>
       </div>
       <div style={messageStyle}>
-        This ensures that Picture-in-Picture will be automatically reactivated
-        when you leave this tab again.
+        {intl.formatMessage(intlMessages.warningMessage)}
       </div>
     </div>
   );
