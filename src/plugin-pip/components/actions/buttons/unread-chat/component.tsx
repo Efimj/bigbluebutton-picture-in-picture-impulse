@@ -36,27 +36,32 @@ function UnreadChatButtonComponent(
 
   return (
     <Tooltip content={tooltipMessage}>
-      <button
-        className="media-btn"
-        type="button"
-        disabled={disabled}
-        onClick={() => {
-          pluginApi.uiCommands.chat.form.open();
-          pipWindow.close();
-        }}
-      >
-        <span className="sr-only">
-          {tooltipMessage}
-        </span>
-        <i className="icon-bbb-group_chat" />
-        {!disabled && (
-        <div className="badge" aria-hidden>
-          <span>
-            {publicChat?.chat[0].totalUnread}
+      {({ children, styles, ...props }) => (
+        <button
+          {...props}
+          className="media-btn"
+          type="button"
+          disabled={disabled}
+          style={styles}
+          onClick={() => {
+            pluginApi.uiCommands.chat.form.open();
+            pipWindow.close();
+          }}
+        >
+          <span className="sr-only">
+            {tooltipMessage}
           </span>
-        </div>
-        )}
-      </button>
+          <i className="icon-bbb-group_chat" />
+          {!disabled && (
+          <div className="badge">
+            <span>
+              {publicChat?.chat[0].totalUnread}
+            </span>
+          </div>
+          )}
+          {children}
+        </button>
+      )}
     </Tooltip>
   );
 }

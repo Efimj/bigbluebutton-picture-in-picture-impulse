@@ -6,6 +6,7 @@ import WebcamButtonComponent from './buttons/webcam/component';
 import UnreadChatButtonComponent from './buttons/unread-chat/component';
 import RaisedHandsButtonComponent from './buttons/raised-hands/component';
 import UsersBadgeComponent from './buttons/users/component';
+import LayoutButtonComponent from './buttons/layout/component';
 import { useLayoutContext } from '../contexts/layout';
 
 interface ActionsComponentProps {
@@ -31,7 +32,8 @@ function ActionsComponent({ intl, pluginApi, pipWindow }: ActionsComponentProps)
         <AudioButtonComponent intl={intl} pluginApi={pluginApi} />
         <WebcamButtonComponent intl={intl} pluginApi={pluginApi} />
         <UnreadChatButtonComponent intl={intl} pluginApi={pluginApi} pipWindow={pipWindow} />
-        <RaisedHandsButtonComponent intl={intl} pluginApi={pluginApi} pipWindow={pipWindow} />
+        <RaisedHandsButtonComponent intl={intl} pluginApi={pluginApi} />
+        <LayoutButtonComponent intl={intl} />
         <div
           style={{
             width: '1px',

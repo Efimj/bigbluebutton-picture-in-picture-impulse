@@ -74,10 +74,8 @@ function ChatMessageToast({ intl, message }: ChatMessageToastProps): React.React
     lineHeight: '1.5',
     color: 'rgba(255, 255, 255, 0.95)',
     wordBreak: 'break-word',
-    maxHeight: '40px',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-    textOverflow: 'ellipsis',
+    maxHeight: '60px',
+    overflow: 'auto',
   };
 
   const footerStyles: React.CSSProperties = {
@@ -129,7 +127,7 @@ function ChatNotifier({ intl, pluginApi }: ChatNotifierProps): React.ReactNode {
   React.useEffect(() => {
     if (!chatMessageStream?.chat_message_stream) return;
     chatMessageStream.chat_message_stream.forEach((msg) => {
-      showToast(<ChatMessageToast intl={intl} message={msg} />, 'default', 20000);
+      showToast(<ChatMessageToast intl={intl} message={msg} />, 'default', 10000);
     });
   }, [chatMessageStream, showToast]);
 

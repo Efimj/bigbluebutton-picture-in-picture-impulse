@@ -2,250 +2,17 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { ActionButtonDropdownOption, BbbPluginSdk, FloatingWindow } from 'bigbluebutton-html-plugin-sdk';
 import { defineMessages } from 'react-intl';
-import { css } from 'styled-components';
+import { useI18n } from '../common/hooks';
 import Pip from '../plugin-pip/component';
 import { useVideoStreams } from '../plugin-pip/components/cameras/hooks';
 import { useScreenshare } from '../plugin-pip/components/screenshare/hooks';
 import FocusWarning from '../plugin-pip/components/warning/component';
-import { useI18n } from '../common/hooks';
+import { useCurrentUserVoice } from '../plugin-pip/components/actions/hooks';
+import styles from './stylesheet';
 
 const isPipSupported = 'documentPictureInPicture' in window;
 
-const cssRules = css`
-  * {
-    box-sizing: border-box;
-    min-width: 0;
-  }
-
-  *::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-  }
-  *::-webkit-scrollbar-button {
-    width: 0;
-    height: 0;
-  }
-  *::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,.25);
-    border: none;
-    border-radius: 50px;
-  }
-  *::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.5); }
-  *::-webkit-scrollbar-thumb:active { background: rgba(0,0,0,.25); }
-  *::-webkit-scrollbar-track {
-    background: rgba(0,0,0,.25);
-    border: none;
-    border-radius: 50px;
-  }
-  *::-webkit-scrollbar-track:hover { background: rgba(0,0,0,.25); }
-  *::-webkit-scrollbar-track:active { background: rgba(0,0,0,.25); }
-  *::-webkit-scrollbar-corner { background: 0 0; }
-  
-  #videoWrapper {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-  }
-
-  video {
-    border-radius: 8px;
-    border: 2px solid transparent;
-  }
-
-  video.talking {
-    border-color: #3b82f6;
-  }
-
-  html {
-    height: 100%;
-    overflow: hidden;
-  }
-
-  body {
-    font-family: 'Source Sans Pro', Arial, sans-serif;
-    font-size: 1rem;
-    background-color: #202020;
-    height: 100%;
-  }
-
-  #pip-root {
-    height: 100%;
-  }
-
-  .container {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
-
-  .actions {
-    padding: 0.5rem;
-    width: 100%;
-    display: flex;
-    align-items: flex-end;
-
-    .controls {
-      background-color: #303030;
-      display: flex;
-      flex-direction: row;
-      justify-content: center;
-      align-items: center;
-      gap: 1rem;
-      border-radius: 0.75rem;
-      flex-grow: 1;
-      padding: 0.25rem;
-      height: 100%;
-    }
-  }
-
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    border: 0;
-  }
-
-  @font-face {
-    font-family: 'bbb-icons';
-    src: url('fonts/BbbIcons/bbb-icons.woff2?v=VERSION') format('woff2'),
-    url('fonts/BbbIcons/bbb-icons.woff?v=VERSION') format('woff');
-    font-weight: normal;
-    font-style: normal;
-  }
-
-  *:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .media-btn {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    font-size: 1rem;
-    padding: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    line-height: normal;
-    position: relative;
-  }
-
-  .media-btn:disabled {
-    cursor: not-allowed;
-  }
-
-  .media-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .media-btn:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px #ffffff;
-  }
-
-  .badge {
-    position: absolute;
-    right: -10%;
-    top: -10%;
-    border-radius: 50%;
-    line-height: 1;
-    padding: 2px;
-    height: 1rem;
-    width: 1rem;
-    font-size: 0.65rem;
-    display: grid;
-    place-items: center;
-    background-color: #DF2721;
-  }
-
-  .video {
-    flex-grow: 1;
-    flex-shrink: 1;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .webcams {
-    display: grid;
-    gap: 6px;
-  }
-
-  .webcams video {
-    width: 100%;
-    height: 100%;
-  }
-
-  .pip-video-container {
-    position: relative;
-    display: flex;
-    background-color: #000;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .cameras {
-    padding: 0.5rem;
-  }
-
-  .screenshare {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem;
-
-    video {
-      height: 100%;
-      width: auto;
-    }
-  }
-
-  .container:not(.has-webcams) .screenshare video {
-    object-position: center;
-  }
-
-  @keyframes pulse {
-    0% {
-      box-shadow: 0 0 0 0 white;
-    }
-    70% {
-      box-shadow: 0 0 0 0.5625rem transparent;
-    }
-    100% {
-      box-shadow: 0 0 0 0 transparent;
-    } 
-  }
-
-  .pulse {
-    animation: pulse 1s ease-in infinite;
-  }
-
-  .pip-video-container .username {
-    position: absolute;
-    color: white;
-    left: 0.25rem;
-    bottom: 0.25rem;
-    font-size: 65%;
-    background-color: #111111CC;
-    padding: 0.2rem;
-    border-radius: 0.75rem;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    max-width: 80%;
-  }
-`;
-
-export const intlMessages = defineMessages({
+const intlMessages = defineMessages({
   activate: {
     id: 'plugin.pip.activate',
     defaultMessage: 'Activate PiP Window',
@@ -266,7 +33,6 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   const { intl } = useI18n(pluginApi);
   const pipActiveRef = React.useRef(JSON.parse(localStorage.getItem('pip-plugin-active')));
   const pipWindowRef = React.useRef<Window | null>(null);
-  const pipRootRef = React.useRef<ReactDOM.Root | null>(null);
   const hasMediaRef = React.useRef(false);
   const [pipActive, setPipActive] = React.useState<boolean>(JSON.parse(localStorage.getItem('pip-plugin-active')));
   const [showFocusWarning, setShowFocusWarning] = React.useState(false);
@@ -276,6 +42,9 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   const hasScreenshare = Boolean(screenshare?.screenshare?.length);
   const hasMedia = hasScreenshare || hasWebcams;
   hasMediaRef.current = hasMedia;
+  const { data: currentUser } = pluginApi.useCurrentUser();
+  const { joined: joinedVoice } = useCurrentUserVoice(pluginApi) || {};
+  const amISharingWebcam = Boolean(currentUser?.cameras?.length);
 
   if (isPipSupported) {
     const activateLabel = intl?.formatMessage(intlMessages.activate) || 'Activate PiP Window';
@@ -296,76 +65,92 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   }
 
   React.useEffect(() => {
-    if (!isPipSupported) return undefined;
+    const startPipWindow = async () => {
+      if (isPipSupported && pipActiveRef.current && hasMediaRef.current) {
+        // @ts-expect-error This web API may not be supported by all major browsers.
+        if (documentPictureInPicture.window) return false;
 
-    const handler = async () => {
-      if (intl && pipActiveRef.current && hasMediaRef.current && document.hidden) {
-        try {
-          // @ts-expect-error This web API may not be supported by all major browsers.
-          const pipWindow = await documentPictureInPicture.requestWindow({
-            height: 270,
-            width: 480,
-            preferInitialWindowPlacement: true,
-          });
+        // @ts-expect-error This web API may not be supported by all major browsers.
+        const pipWindow = await documentPictureInPicture.requestWindow({
+          height: 270,
+          width: 480,
+          preferInitialWindowPlacement: true,
+        });
 
-          pipWindowRef.current = pipWindow;
+        pipWindowRef.current = pipWindow;
 
-          const pipDiv = pipWindow.document.createElement('div');
-          pipDiv.setAttribute('id', 'pip-root');
-          pipWindow.document.body.append(pipDiv);
-          const pipRoot = ReactDOM.createRoot(pipWindow.document.getElementById('pip-root'));
-          pipRootRef.current = pipRoot;
+        const pipDiv = pipWindow.document.createElement('div');
+        pipDiv.setAttribute('id', 'pip-root');
+        pipWindow.document.body.append(pipDiv);
+        const pipRoot = ReactDOM.createRoot(pipWindow.document.getElementById('pip-root'));
 
-          const handlePageHide = () => {
-            pipRoot.unmount();
-            window.focus();
-          };
+        const handlePageHide = () => {
+          pipWindowRef.current = null;
+          pipRoot.unmount();
+        };
 
-          pipWindow.addEventListener('pagehide', handlePageHide);
+        pipWindow.addEventListener('pagehide', handlePageHide);
 
-          const style = document.createElement('style');
-          style.textContent = cssRules.toString();
-          pipWindow.document.head.appendChild(style);
+        const style = document.createElement('style');
+        style.textContent = styles.toString();
+        pipWindow.document.head.appendChild(style);
 
-          const normalize = document.createElement('link');
-          normalize.rel = 'stylesheet';
-          normalize.type = 'text/css';
-          normalize.href = 'stylesheets/normalize.css';
-          pipWindow.document.head.appendChild(normalize);
+        const normalize = document.createElement('link');
+        normalize.rel = 'stylesheet';
+        normalize.type = 'text/css';
+        normalize.href = 'stylesheets/normalize.css';
+        pipWindow.document.head.appendChild(normalize);
 
-          const icons = document.createElement('link');
-          icons.rel = 'stylesheet';
-          icons.type = 'text/css';
-          icons.href = 'stylesheets/bbb-icons.css';
-          pipWindow.document.head.appendChild(icons);
+        const icons = document.createElement('link');
+        icons.rel = 'stylesheet';
+        icons.type = 'text/css';
+        icons.href = 'stylesheets/bbb-icons.css';
+        pipWindow.document.head.appendChild(icons);
 
-          const fonts = document.createElement('link');
-          fonts.rel = 'stylesheet';
-          fonts.type = 'text/css';
-          fonts.href = 'stylesheets/bbb-icons.css';
-          pipWindow.document.head.appendChild(fonts);
+        const fonts = document.createElement('link');
+        fonts.rel = 'stylesheet';
+        fonts.type = 'text/css';
+        fonts.href = 'stylesheets/bbb-icons.css';
+        pipWindow.document.head.appendChild(fonts);
 
-          pipRoot.render(
-            <Pip
-              pluginApi={pluginApi}
-              pipWindow={pipWindow}
-              intl={intl}
-            />,
-          );
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error(error);
-        }
-      } else if (!document.hidden) {
-        pipRootRef.current?.unmount();
+        pipRoot.render(
+          <Pip
+            pluginApi={pluginApi}
+            pipWindow={pipWindow}
+            intl={intl}
+          />,
+        );
+
+        return true;
+      }
+
+      return false;
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // eslint-disable-next-line no-console
+        startPipWindow().then((started) => { if (started) console.info('PiP window started by visibility change'); }).catch(console.warn);
+      } else {
         pipWindowRef.current?.close();
       }
     };
 
-    document.addEventListener('visibilitychange', handler);
+    const handleEnterPip = () => {
+      // eslint-disable-next-line no-console
+      startPipWindow().then((started) => { if (started) console.info('PiP window started by PiP action'); }).catch(console.warn);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // @ts-expect-error This media action may not be supported by all major browsers.
+    navigator.mediaSession.setActionHandler('enterpictureinpicture', handleEnterPip);
 
     return () => {
-      document.removeEventListener('visibilitychange', handler);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+      // @ts-expect-error This media action may not be supported by all major browsers.
+      navigator.mediaSession.setActionHandler('enterpictureinpicture', null);
     };
   }, [intl, pluginApi]);
 
@@ -373,7 +158,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     if (!isPipSupported || !pipActive) return undefined;
 
     function handleVisibilityChange() {
-      setShowFocusWarning(!document.hidden);
+      setShowFocusWarning(!document.hidden && !amISharingWebcam && !joinedVoice);
     }
 
     function handleFocus() {
@@ -381,16 +166,16 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    document.addEventListener('click', handleFocus);
+    document.addEventListener('click', handleFocus, { capture: true });
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      document.removeEventListener('click', handleFocus);
+      document.removeEventListener('click', handleFocus, { capture: true });
     };
-  }, [pipActive]);
+  }, [pipActive, amISharingWebcam, joinedVoice]);
 
   React.useEffect(() => {
-    if (!isPipSupported || !pipActive) return;
+    if (!isPipSupported || !pipActive) return undefined;
 
     if (showFocusWarning) {
       const actionsButton = document.querySelector('[data-test="actionsButton"]');
@@ -401,7 +186,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           top: rect.top - 90,
           left: rect.left + (rect.width / 2) - 181,
           movable: true,
-          backgroundColor: 'white',
+          backgroundColor: 'transparent',
           boxShadow: 'none',
           contentFunction: (element: HTMLElement) => {
             const root = ReactDOM.createRoot(element);
@@ -410,9 +195,11 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           },
         }),
       ]);
-    } else {
-      pluginApi.setFloatingWindows([]);
     }
+
+    return () => {
+      pluginApi.setFloatingWindows([]);
+    };
   }, [showFocusWarning, pluginApi, pipActive]);
 
   return null;

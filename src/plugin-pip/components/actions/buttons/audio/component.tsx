@@ -59,27 +59,32 @@ function AudioButtonComponent({ intl, pluginApi }: AudioButtonComponentProps) {
 
   return (
     <Tooltip content={title}>
-      <button
-        className={className.join(' ')}
-        type="button"
-        disabled={noAudio}
-        onClick={() => {
-          if (currentUser && currentUser.data && !noAudio) {
-            toggleVoice(currentUser.data.userId, !currentUserVoice.muted);
-          }
-        }}
-      >
-        <span className="sr-only">
-          {currentUserVoice?.muted
-            ? intl.formatMessage(intlMessages.audioSrOnlyUnmute)
-            : intl.formatMessage(intlMessages.audioSrOnlyMute)}
-        </span>
-        {noAudio ? (
-          <i className="icon-bbb-no_audio" />
-        ) : (
-          <i className={`icon-bbb-${currentUserVoice?.muted ? 'mute' : 'unmute'}`} />
-        )}
-      </button>
+      {({ children, styles, ...props }) => (
+        <button
+          {...props}
+          className={className.join(' ')}
+          type="button"
+          style={styles}
+          disabled={noAudio}
+          onClick={() => {
+            if (currentUser && currentUser.data && !noAudio) {
+              toggleVoice(currentUser.data.userId, !currentUserVoice.muted);
+            }
+          }}
+        >
+          <span className="sr-only">
+            {currentUserVoice?.muted
+              ? intl.formatMessage(intlMessages.audioSrOnlyUnmute)
+              : intl.formatMessage(intlMessages.audioSrOnlyMute)}
+          </span>
+          {noAudio ? (
+            <i className="icon-bbb-no_audio" />
+          ) : (
+            <i className={`icon-bbb-${currentUserVoice?.muted ? 'mute' : 'unmute'}`} />
+          )}
+          {children}
+        </button>
+      )}
     </Tooltip>
   );
 }

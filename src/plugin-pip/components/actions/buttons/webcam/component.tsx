@@ -42,19 +42,24 @@ function WebcamButtonComponent({ intl, pluginApi }: WebcamButtonComponentProps) 
 
   return (
     <Tooltip content={amISharing ? stopSharingLabel : notSharingLabel}>
-      <button
-        className="media-btn"
-        type="button"
-        onClick={() => {
-          if (amISharing) exitVideo();
-        }}
-        disabled={!amISharing}
-      >
-        <span className="sr-only">
-          {intl.formatMessage(intlMessages.webcamSrOnly)}
-        </span>
-        <i className={`icon-bbb-${amISharing ? 'video' : 'video_off'}`} />
-      </button>
+      {({ children, styles, ...props }) => (
+        <button
+          {...props}
+          className="media-btn"
+          type="button"
+          style={styles}
+          onClick={() => {
+            if (amISharing) exitVideo();
+          }}
+          disabled={!amISharing}
+        >
+          <span className="sr-only">
+            {intl.formatMessage(intlMessages.webcamSrOnly)}
+          </span>
+          <i className={`icon-bbb-${amISharing ? 'video' : 'video_off'}`} />
+          {children}
+        </button>
+      )}
     </Tooltip>
   );
 }

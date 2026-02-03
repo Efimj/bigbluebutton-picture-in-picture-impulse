@@ -19,7 +19,8 @@ interface FocusWarningProps {
 function FocusWarning({ intl }: FocusWarningProps): React.ReactNode {
   const containerStyle: React.CSSProperties = {
     backgroundColor: '#303030',
-    padding: '0.5rem',
+    borderRadius: '10px',
+    padding: '8px',
     maxWidth: '362px',
     height: '75px',
     textAlign: 'center',
@@ -36,14 +37,14 @@ function FocusWarning({ intl }: FocusWarningProps): React.ReactNode {
 
   const titleStyle: React.CSSProperties = {
     color: '#fff',
-    fontSize: '1rem',
+    fontSize: '14px',
     fontWeight: 600,
-    marginBottom: '0.75rem',
+    marginBottom: '12px',
   };
 
   const messageStyle: React.CSSProperties = {
     color: '#d1d5db',
-    fontSize: '0.875rem',
+    fontSize: '12px',
     lineHeight: 1.6,
   };
 
