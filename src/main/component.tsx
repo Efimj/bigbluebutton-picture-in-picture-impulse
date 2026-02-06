@@ -3,6 +3,7 @@ import * as ReactDOM from 'react-dom/client';
 import { ActionButtonDropdownOption, BbbPluginSdk, FloatingWindow } from 'bigbluebutton-html-plugin-sdk';
 import { defineMessages } from 'react-intl';
 import { useI18n } from '../common/hooks';
+import { acquireKeepAlive, releaseKeepAlive, resumeMainTabVideos } from '../common/keep-alive';
 import Pip from '../plugin-pip/component';
 import { useVideoStreams } from '../plugin-pip/components/cameras/hooks';
 import { useScreenshare } from '../plugin-pip/components/screenshare/hooks';
@@ -86,6 +87,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
 
         const handlePageHide = () => {
           pipWindowRef.current = null;
+          releaseKeepAlive();
           pipRoot.unmount();
         };
 
@@ -129,10 +131,15 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
+        acquireKeepAlive();
         // eslint-disable-next-line no-console
         startPipWindow().then((started) => { if (started) console.info('PiP window started by visibility change'); }).catch(console.warn);
       } else {
+        releaseKeepAlive();
         pipWindowRef.current?.close();
+        // Force-resume videos in the main tab that may have been paused
+        // by the browser while the tab was in the background.
+        resumeMainTabVideos();
       }
     };
 
@@ -148,6 +155,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseKeepAlive();
 
       // @ts-expect-error This media action may not be supported by all major browsers.
       navigator.mediaSession.setActionHandler('enterpictureinpicture', null);
