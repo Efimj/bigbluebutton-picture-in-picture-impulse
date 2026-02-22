@@ -1,6 +1,6 @@
 {
-  "name": "bbb-plugin-picture-in-picture",
-  "version": "0.0.1",
+  "name": "bigbluebutton-picture-in-picture",
+  "version": "1.0.0",
   "private": true,
   "main": "./src/index.tsx",
   "dependencies": {
