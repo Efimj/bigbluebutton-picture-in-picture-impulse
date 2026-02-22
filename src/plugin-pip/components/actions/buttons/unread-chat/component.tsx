@@ -18,17 +18,19 @@ const intlMessages = defineMessages({
 interface UnreadChatButtonComponentProps {
   intl: IntlShape;
   pluginApi: PluginApi;
-  pipWindow: Window;
+  chatOpen: boolean;
+  onChatToggle: () => void;
 }
 
 function UnreadChatButtonComponent(
-  { intl, pluginApi, pipWindow }: UnreadChatButtonComponentProps,
+  {
+    intl, pluginApi, chatOpen, onChatToggle,
+  }: UnreadChatButtonComponentProps,
 ): React.ReactNode {
   const {
     data: publicChat,
   } = pluginApi.useCustomSubscription!<PublicChatSubscriptionResult>(PUBLIC_CHAT);
   const unreadCount = publicChat?.chat[0]?.totalUnread ?? 0;
-  const disabled = unreadCount === 0;
 
   const tooltipMessage = unreadCount > 0
     ? intl.formatMessage(intlMessages.unreadChatTooltipCount, { count: unreadCount })
@@ -41,23 +43,21 @@ function UnreadChatButtonComponent(
           {...props}
           className="media-btn"
           type="button"
-          disabled={disabled}
-          style={styles}
-          onClick={() => {
-            pluginApi.uiCommands.chat.form.open();
-            pipWindow.close();
+          aria-pressed={chatOpen}
+          style={{
+            ...styles,
+            backgroundColor: chatOpen ? 'rgba(255,255,255,0.15)' : undefined,
           }}
+          onClick={onChatToggle}
         >
           <span className="sr-only">
             {tooltipMessage}
           </span>
           <i className="icon-bbb-group_chat" />
-          {!disabled && (
-          <div className="badge">
-            <span>
-              {publicChat?.chat[0].totalUnread}
-            </span>
-          </div>
+          {unreadCount > 0 && (
+            <div className="badge">
+              <span>{unreadCount}</span>
+            </div>
           )}
           {children}
         </button>

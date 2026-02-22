@@ -12,10 +12,13 @@ import { useLayoutContext } from '../contexts/layout';
 interface ActionsComponentProps {
   intl: IntlShape;
   pluginApi: PluginApi;
-  pipWindow: Window;
+  chatOpen: boolean;
+  onChatToggle: () => void;
 }
 
-function ActionsComponent({ intl, pluginApi, pipWindow }: ActionsComponentProps): React.ReactNode {
+function ActionsComponent({
+  intl, pluginApi, chatOpen, onChatToggle,
+}: ActionsComponentProps): React.ReactNode {
   const { actions } = useLayoutContext();
   return (
     <div
@@ -31,7 +34,12 @@ function ActionsComponent({ intl, pluginApi, pipWindow }: ActionsComponentProps)
       <div className="controls">
         <AudioButtonComponent intl={intl} pluginApi={pluginApi} />
         <WebcamButtonComponent intl={intl} pluginApi={pluginApi} />
-        <UnreadChatButtonComponent intl={intl} pluginApi={pluginApi} pipWindow={pipWindow} />
+        <UnreadChatButtonComponent
+          intl={intl}
+          pluginApi={pluginApi}
+          chatOpen={chatOpen}
+          onChatToggle={onChatToggle}
+        />
         <RaisedHandsButtonComponent intl={intl} pluginApi={pluginApi} />
         <LayoutButtonComponent intl={intl} />
         <div

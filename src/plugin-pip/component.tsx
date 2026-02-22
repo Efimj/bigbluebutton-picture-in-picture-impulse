@@ -5,17 +5,42 @@ import CamerasComponent from './components/cameras/component';
 import ActionsComponent from './components/actions/component';
 import ScreenshareComponent from './components/screenshare/component';
 import ChatNotifier from './components/chat/notifier';
+import ChatPanel from './components/chat/panel';
 import RaisedHandNotifier from './components/raised-hands/component';
 import { ToastProvider } from './components/ui/toast';
 import { useVideoStreams } from './components/cameras/hooks';
 import { useScreenshare } from './components/screenshare/hooks';
 import { PipWindowProvider } from './components/contexts/pip-window';
-import { LayoutProvider } from './components/contexts/layout';
+import { LayoutProvider, useLayoutContext } from './components/contexts/layout';
 
 interface PluginPipProps {
   intl: IntlShape
   pluginApi: PluginApi;
   pipWindow: Window;
+}
+
+function PluginPipInner({ intl, pluginApi }: Omit<PluginPipProps, 'pipWindow'>): React.ReactNode {
+  const [chatOpen, setChatOpen] = React.useState(false);
+  const { actions } = useLayoutContext();
+
+  return (
+    <>
+      <ActionsComponent
+        pluginApi={pluginApi}
+        intl={intl}
+        chatOpen={chatOpen}
+        onChatToggle={() => setChatOpen((v) => !v)}
+      />
+      {chatOpen && (
+        <ChatPanel
+          intl={intl}
+          pluginApi={pluginApi}
+          onClose={() => setChatOpen(false)}
+          actionsHeight={actions.height}
+        />
+      )}
+    </>
+  );
 }
 
 function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactNode {
@@ -47,7 +72,7 @@ function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactN
               <ScreenshareComponent pluginApi={pluginApi} />
               <CamerasComponent pluginApi={pluginApi} />
             </div>
-            <ActionsComponent pluginApi={pluginApi} pipWindow={pipWindow} intl={intl} />
+            <PluginPipInner intl={intl} pluginApi={pluginApi} />
           </div>
           <ChatNotifier intl={intl} pluginApi={pluginApi} />
           {presenter && <RaisedHandNotifier intl={intl} pluginApi={pluginApi} />}

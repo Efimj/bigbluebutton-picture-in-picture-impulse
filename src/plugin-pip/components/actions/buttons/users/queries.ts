@@ -15,3 +15,19 @@ export interface UsersCountSubscriptionResponse {
     };
   };
 }
+
+export const USER_NAMES_SUBSCRIPTION = `
+  subscription UsersNames {
+    user(order_by: { name: asc }) {
+      name
+      userId
+    }
+  }
+`;
+
+export interface UsersNamesSubscriptionResponse {
+  user: Array<{
+    name: string;
+    userId: string;
+  }>;
+}

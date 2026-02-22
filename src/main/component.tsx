@@ -71,12 +71,23 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
         // @ts-expect-error This web API may not be supported by all major browsers.
         if (documentPictureInPicture.window) return false;
 
-        // @ts-expect-error This web API may not be supported by all major browsers.
-        const pipWindow = await documentPictureInPicture.requestWindow({
-          height: 270,
-          width: 480,
-          preferInitialWindowPlacement: true,
-        });
+        // Some Chromium-based browsers (e.g. Yandex Browser) may not support
+        // the preferInitialWindowPlacement option — retry without it as a fallback.
+        let pipWindow: Window;
+        try {
+          // @ts-expect-error This web API may not be supported by all major browsers.
+          pipWindow = await documentPictureInPicture.requestWindow({
+            height: 270,
+            width: 480,
+            preferInitialWindowPlacement: true,
+          });
+        } catch {
+          // @ts-expect-error This web API may not be supported by all major browsers.
+          pipWindow = await documentPictureInPicture.requestWindow({
+            height: 270,
+            width: 480,
+          });
+        }
 
         pipWindowRef.current = pipWindow;
 

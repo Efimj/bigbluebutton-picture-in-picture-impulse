@@ -34,3 +34,26 @@ export interface Message {
 export interface ChatMessageStreamResponse {
   chat_message_stream: Array<Message>;
 }
+
+export const CHAT_ALL_MESSAGES_SUBSCRIPTION = `
+  subscription ChatAllMessages {
+    chat_message(
+      where: { chat: { public: { _eq: true } } }
+      order_by: { createdAt: asc }
+    ) {
+      chatId
+      createdAt
+      message
+      messageAsHtml
+      messageId
+      messageType
+      senderName
+      senderRole
+      senderId
+    }
+  }
+`;
+
+export interface ChatAllMessagesResponse {
+  chat_message: Array<Omit<Message, 'messageMetadata'>>;
+}
