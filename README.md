@@ -6,6 +6,15 @@ A plugin that starts up a picture-in-picture window with webcams and screen shar
 
 ![Plugin screenshot](demo.png)
 
+## Supported Languages
+
+- **be** — Belarusian
+- **en** — English
+- **pl** — Polish
+- **pt-BR** — Portuguese (Brazil)
+- **ru** — Russian
+- **uk** — Ukrainian
+
 ## Building the Plugin
 
 To build the plugin for production use, follow these steps:
