@@ -1,7 +1,14 @@
 import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { defineMessages, IntlShape } from 'react-intl';
-import { CHAT_ALL_MESSAGES_SUBSCRIPTION, ChatAllMessagesResponse } from './queries';
+import {
+  CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION,
+  CHAT_ALL_MESSAGES_SUBSCRIPTION,
+  ChatAllMessagesResponse,
+  CHAT_MESSAGE_STREAM,
+  ChatMessageStreamResponse,
+  Message,
+} from './queries';
 
 const intlMessages = defineMessages({
   title: {
@@ -15,6 +22,10 @@ const intlMessages = defineMessages({
   close: {
     id: 'plugin.chat.panel.close',
     defaultMessage: 'Close chat',
+  },
+  unknownUser: {
+    id: 'plugin.chat.panel.unknownUser',
+    defaultMessage: 'Unknown User',
   },
 });
 
@@ -30,11 +41,63 @@ function ChatPanel({
   intl, pluginApi, onClose, actionsHeight,
 }: ChatPanelProps): React.ReactNode {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const streamCursorRef = React.useRef(new Date().toISOString());
+  type PanelMessage = Omit<Message, 'messageMetadata'> | Message;
+  const [streamHistory, setStreamHistory] = React.useState<PanelMessage[]>([]);
 
   const { data } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
     CHAT_ALL_MESSAGES_SUBSCRIPTION,
   );
-  const messages = data?.chat_message ?? [];
+  const { data: fallbackData } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
+    CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION,
+  );
+  const { data: streamData } = pluginApi.useCustomSubscription!<ChatMessageStreamResponse>(
+    CHAT_MESSAGE_STREAM,
+    {
+      variables: {
+        createdAt: streamCursorRef.current,
+      },
+    },
+  );
+
+  const publicMessages = data?.chat_message ?? [];
+  const fallbackMessages = fallbackData?.chat_message ?? [];
+  const streamMessages = streamData?.chat_message_stream ?? [];
+
+  const getMessageKey = React.useCallback((msg: PanelMessage) => (
+    [
+      msg.messageId || 'no-message-id',
+      msg.createdAt || '',
+      msg.senderId || msg.senderName || '',
+      msg.messageAsHtml || msg.message || '',
+    ].join('|')
+  ), []);
+
+  React.useEffect(() => {
+    if (!streamMessages.length) return;
+
+    setStreamHistory((prev) => {
+      const byId = new Map<string, PanelMessage>();
+      [...prev, ...streamMessages].forEach((msg) => {
+        byId.set(getMessageKey(msg), msg);
+      });
+      return Array.from(byId.values())
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    });
+  }, [streamMessages, getMessageKey]);
+
+  const messages = React.useMemo<PanelMessage[]>(() => {
+    const baseMessages = publicMessages.length > 0 ? publicMessages : fallbackMessages;
+    const merged = [...baseMessages, ...streamHistory];
+
+    const byId = new Map<string, PanelMessage>();
+    merged.forEach((msg) => {
+      byId.set(getMessageKey(msg), msg);
+    });
+
+    return Array.from(byId.values())
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [publicMessages, fallbackMessages, streamHistory, getMessageKey]);
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,7 +114,13 @@ function ChatPanel({
     return name.substring(0, 2);
   };
 
-  const isSystemMessage = (type: string) => type !== 'USER_MESSAGE';
+  const isSystemMessage = (msg: PanelMessage) => {
+    // Some deployments send user chat with different messageType values.
+    // If a sender exists, treat it as a regular user message.
+    const hasAuthor = Boolean(msg.senderName || msg.senderId);
+    if (hasAuthor) return false;
+    return msg.messageType !== 'USER_MESSAGE';
+  };
 
   return (
     <div
@@ -127,10 +196,10 @@ function ChatPanel({
         )}
 
         {messages.map((msg) => {
-          if (isSystemMessage(msg.messageType)) {
+          if (isSystemMessage(msg)) {
             return (
               <div
-                key={msg.messageId}
+                key={getMessageKey(msg)}
                 style={{
                   textAlign: 'center',
                   fontSize: '10px',
@@ -143,8 +212,10 @@ function ChatPanel({
             );
           }
 
+          const senderName = msg.senderName || intl.formatMessage(intlMessages.unknownUser);
+
           return (
-            <div key={msg.messageId} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+            <div key={getMessageKey(msg)} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
               {/* Avatar */}
               <div
                 style={{
@@ -162,7 +233,7 @@ function ChatPanel({
                   textTransform: 'capitalize',
                 }}
               >
-                {getInitials(msg.senderName)}
+                {getInitials(senderName)}
               </div>
 
               {/* Content */}
@@ -185,7 +256,7 @@ function ChatPanel({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {msg.senderName}
+                    {senderName}
                   </span>
                   {msg.createdAt && (
                     <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
@@ -201,7 +272,7 @@ function ChatPanel({
                     wordBreak: 'break-word',
                     lineHeight: '1.4',
                   }}
-                  dangerouslySetInnerHTML={{ __html: msg.messageAsHtml }}
+                  dangerouslySetInnerHTML={{ __html: msg.messageAsHtml || msg.message }}
                 />
               </div>
             </div>

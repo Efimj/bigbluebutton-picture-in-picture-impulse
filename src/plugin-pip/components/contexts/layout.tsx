@@ -17,7 +17,7 @@ interface LayoutContext {
   canSwap: boolean;
 }
 
-const LayoutContext = React.createContext<LayoutContext>(null);
+const LayoutContext = React.createContext<LayoutContext | null>(null);
 
 export function useLayoutContext(): LayoutContext {
   const layout = React.useContext(LayoutContext);
@@ -39,86 +39,90 @@ export function LayoutProvider({
   children, hasScreenshare, hasCameras, presenter, moderator,
 }: LayoutProviderProps) {
   const pipWindow = usePipWindow();
-  const [swapped, setSwapped] = React.useState<boolean | null>(null);
-  const [layout, setLayout] = React.useState<Omit<LayoutContext, 'swapped' | 'swap'> | null>(null);
+  const hasScreenshareEnabled = Boolean(hasScreenshare);
+  const hasCamerasEnabled = Boolean(hasCameras);
+  const swappedFromProps = (presenter || moderator) && hasScreenshareEnabled && hasCamerasEnabled;
+  const [swapped, setSwapped] = React.useState<boolean>(Boolean(swappedFromProps));
 
-  const loading = [hasCameras, hasScreenshare, presenter, moderator].some((v) => v == null);
-  const swappedFromProps = (presenter || moderator) && hasScreenshare && hasCameras;
+  const calculateLayout = React.useCallback((shouldSwap: boolean): Pick<LayoutContext, 'actions' | 'screenshare' | 'cameras'> => {
+    // Some Chromium forks can return 0x0 for inner size in Document PiP.
+    const width = pipWindow.innerWidth
+      || pipWindow.document.documentElement.clientWidth
+      || 480;
+    const height = pipWindow.innerHeight
+      || pipWindow.document.documentElement.clientHeight
+      || 270;
+
+    const actionsHeight = 56;
+    const actionsRect: Rect = {
+      x: 0,
+      y: Math.max(0, height - actionsHeight),
+      width,
+      height: actionsHeight,
+    };
+
+    const availableHeight = Math.max(height - actionsHeight, 0);
+
+    let screenshareRect: Rect = {
+      x: 0, y: 0, width: 0, height: 0,
+    };
+    let camerasRect: Rect = {
+      x: 0, y: 0, width: 0, height: 0,
+    };
+
+    if (hasScreenshareEnabled && hasCamerasEnabled) {
+      screenshareRect = {
+        x: 0,
+        y: 0,
+        width: width * 0.7,
+        height: availableHeight,
+      };
+      camerasRect = {
+        x: width * 0.7,
+        y: 0,
+        width: width * 0.3,
+        height: availableHeight,
+      };
+    } else if (hasScreenshareEnabled) {
+      screenshareRect = {
+        x: 0,
+        y: 0,
+        width,
+        height: availableHeight,
+      };
+    } else if (hasCamerasEnabled) {
+      camerasRect = {
+        x: 0,
+        y: 0,
+        width,
+        height: availableHeight,
+      };
+    }
+
+    if (shouldSwap && hasCamerasEnabled && hasScreenshareEnabled) {
+      const temp = screenshareRect;
+      screenshareRect = camerasRect;
+      camerasRect = temp;
+    }
+
+    return {
+      actions: actionsRect,
+      screenshare: screenshareRect,
+      cameras: camerasRect,
+    };
+  }, [pipWindow, hasScreenshareEnabled, hasCamerasEnabled]);
+
+  const [layout, setLayout] = React.useState<Pick<LayoutContext, 'actions' | 'screenshare' | 'cameras'>>(
+    () => calculateLayout(Boolean(swappedFromProps)),
+  );
 
   React.useEffect(() => {
-    if (!loading) {
-      setSwapped(swappedFromProps);
-    }
+    setSwapped(Boolean(swappedFromProps));
   }, [swappedFromProps]);
 
   React.useEffect(() => {
-    // Take undefined states into account in order to block UI rendering
-    // until we know there are webcams/screenshare or not.
-    if (hasCameras == null || hasScreenshare == null) return undefined;
-
     const handleResize = () => {
-      const width = pipWindow.innerWidth;
-      const height = pipWindow.innerHeight;
-
-      const actionsHeight = 56;
-      const actionsRect: Rect = {
-        x: 0,
-        y: height - actionsHeight,
-        width,
-        height: actionsHeight,
-      };
-
-      const availableHeight = height - actionsHeight;
-
-      let screenshareRect: Rect = {
-        x: 0, y: 0, width: 0, height: 0,
-      };
-      let camerasRect: Rect = {
-        x: 0, y: 0, width: 0, height: 0,
-      };
-
-      if (hasScreenshare && hasCameras) {
-        screenshareRect = {
-          x: 0,
-          y: 0,
-          width: width * 0.7,
-          height: availableHeight,
-        };
-        camerasRect = {
-          x: width * 0.7,
-          y: 0,
-          width: width * 0.3,
-          height: availableHeight,
-        };
-      } else if (hasScreenshare) {
-        screenshareRect = {
-          x: 0,
-          y: 0,
-          width,
-          height: availableHeight,
-        };
-      } else if (hasCameras) {
-        camerasRect = {
-          x: 0,
-          y: 0,
-          width,
-          height: availableHeight,
-        };
-      }
-
-      if (swapped && hasCameras && hasScreenshare) {
-        // Swap screenshare and cameras for presenter view
-        const temp = screenshareRect;
-        screenshareRect = camerasRect;
-        camerasRect = temp;
-      }
-
-      setLayout((prev) => ({
-        ...prev,
-        actions: actionsRect,
-        screenshare: screenshareRect,
-        cameras: camerasRect,
-      }));
+      setLayout(calculateLayout(swapped));
     };
 
     handleResize();
@@ -127,21 +131,21 @@ export function LayoutProvider({
     return () => {
       pipWindow.removeEventListener('resize', handleResize);
     };
-  }, [pipWindow, hasScreenshare, hasCameras, swapped]);
+  }, [pipWindow, swapped, calculateLayout]);
 
   const value = React.useMemo(
-    () => (layout ? {
+    () => ({
       ...layout,
       swapped,
-      canSwap: hasCameras && hasScreenshare,
+      canSwap: hasCamerasEnabled && hasScreenshareEnabled,
       swap: () => setSwapped((v) => !v),
-    } : null),
-    [layout, swapped, hasCameras, hasScreenshare],
+    }),
+    [layout, swapped, hasCamerasEnabled, hasScreenshareEnabled],
   );
 
-  return value ? (
+  return (
     <LayoutContext.Provider value={value}>
       {children}
     </LayoutContext.Provider>
-  ) : null;
+  );
 }

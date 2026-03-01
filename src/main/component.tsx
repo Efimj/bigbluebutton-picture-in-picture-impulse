@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import { ActionButtonDropdownOption, BbbPluginSdk, FloatingWindow } from 'bigbluebutton-html-plugin-sdk';
-import { defineMessages } from 'react-intl';
+import { defineMessages, IntlShape } from 'react-intl';
 import { useI18n } from '../common/hooks';
 import { acquireKeepAlive, releaseKeepAlive, resumeMainTabVideos } from '../common/keep-alive';
 import Pip from '../plugin-pip/component';
@@ -12,6 +12,7 @@ import { useCurrentUserVoice } from '../plugin-pip/components/actions/hooks';
 import styles from './stylesheet';
 
 const isPipSupported = 'documentPictureInPicture' in window;
+const LOG_PREFIX = '[PiP Plugin]';
 
 const intlMessages = defineMessages({
   activate: {
@@ -32,10 +33,37 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
   const { intl } = useI18n(pluginApi);
-  const pipActiveRef = React.useRef(JSON.parse(localStorage.getItem('pip-plugin-active')));
+  const fallbackIntl = React.useMemo(() => ({
+    formatMessage: (
+      descriptor: { defaultMessage?: string; id?: string } | null | undefined,
+      values?: Record<string, unknown>,
+    ) => {
+      const template = descriptor?.defaultMessage || descriptor?.id || '';
+      if (!values) return template;
+
+      return Object.entries(values).reduce((text, [key, value]) => (
+        text.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value))
+      ), template);
+    },
+    formatTime: (value: string | number | Date) => {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    },
+  }) as unknown as IntlShape, []);
+  const safeIntl = intl || fallbackIntl;
+  const initialPipActive = React.useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('pip-plugin-active') || 'false') === true;
+    } catch {
+      return false;
+    }
+  }, []);
+  const pipActiveRef = React.useRef<boolean>(initialPipActive);
   const pipWindowRef = React.useRef<Window | null>(null);
+  const startPipWindowRef = React.useRef<() => Promise<boolean>>(async () => false);
   const hasMediaRef = React.useRef(false);
-  const [pipActive, setPipActive] = React.useState<boolean>(JSON.parse(localStorage.getItem('pip-plugin-active')));
+  const [pipActive, setPipActive] = React.useState<boolean>(initialPipActive);
   const [showFocusWarning, setShowFocusWarning] = React.useState(false);
   const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
@@ -47,29 +75,79 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   const { joined: joinedVoice } = useCurrentUserVoice(pluginApi) || {};
   const amISharingWebcam = Boolean(currentUser?.cameras?.length);
 
-  if (isPipSupported) {
-    const activateLabel = intl?.formatMessage(intlMessages.activate) || 'Activate PiP Window';
-    const deactivateLabel = intl?.formatMessage(intlMessages.deactivate) || 'Deactivate PiP Window';
+  const handleTogglePip = React.useCallback(() => {
+    const nextPipActive = !pipActiveRef.current;
+    // eslint-disable-next-line no-console
+    console.log(`${LOG_PREFIX} Toggle clicked`, {
+      current: pipActiveRef.current,
+      next: nextPipActive,
+      isPipSupported,
+      hasMedia: hasMediaRef.current,
+    });
+    pipActiveRef.current = nextPipActive;
+    localStorage.setItem('pip-plugin-active', JSON.stringify(nextPipActive));
+    setPipActive(nextPipActive);
+
+    if (nextPipActive) {
+      // Try to open PiP from a direct user gesture (more reliable in some browsers).
+      // eslint-disable-next-line no-console
+      startPipWindowRef.current()
+        .then((started) => {
+          // eslint-disable-next-line no-console
+          console.log(`${LOG_PREFIX} Toggle start result`, { started });
+          if (started) console.info('PiP window started by action button');
+        })
+        .catch((error) => {
+          // eslint-disable-next-line no-console
+          console.error(`${LOG_PREFIX} Toggle start failed`, error);
+        });
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(`${LOG_PREFIX} Toggle deactivated: closing PiP`);
+      releaseKeepAlive();
+      pipWindowRef.current?.close();
+      resumeMainTabVideos();
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!isPipSupported) return;
+
+    const activateLabel = safeIntl.formatMessage(intlMessages.activate) || 'Activate PiP Window';
+    const deactivateLabel = safeIntl.formatMessage(intlMessages.deactivate) || 'Deactivate PiP Window';
+
     pluginApi.setActionButtonDropdownItems([
       new ActionButtonDropdownOption({
+        id: 'plugin-pip-toggle',
+        dataTest: 'plugin-pip-toggle',
         allowed: true,
         icon: pipActive ? 'desktop_off' : 'desktop',
         label: pipActive ? deactivateLabel : activateLabel,
-        onClick: () => {
-          pipActiveRef.current = !pipActiveRef.current;
-          localStorage.setItem('pip-plugin-active', JSON.stringify(pipActiveRef.current));
-          setPipActive(pipActiveRef.current);
-        },
+        onClick: handleTogglePip,
         tooltip: pipActive ? deactivateLabel : activateLabel,
       }),
     ]);
-  }
+  }, [safeIntl, pipActive, pluginApi, handleTogglePip]);
 
   React.useEffect(() => {
     const startPipWindow = async () => {
-      if (isPipSupported && pipActiveRef.current && hasMediaRef.current) {
+      if (isPipSupported && pipActiveRef.current) {
+        // eslint-disable-next-line no-console
+        console.log(`${LOG_PREFIX} Start requested`, {
+          source: 'startPipWindow',
+          active: pipActiveRef.current,
+          hasMedia: hasMediaRef.current,
+        });
+        if (!hasMediaRef.current) {
+          // eslint-disable-next-line no-console
+          console.log(`${LOG_PREFIX} No media detected by hooks, opening PiP anyway`);
+        }
         // @ts-expect-error This web API may not be supported by all major browsers.
-        if (documentPictureInPicture.window) return false;
+        if (documentPictureInPicture.window) {
+          // eslint-disable-next-line no-console
+          console.log(`${LOG_PREFIX} Start skipped: PiP window already open`);
+          return false;
+        }
 
         // Some Chromium-based browsers (e.g. Yandex Browser) may not support
         // the preferInitialWindowPlacement option — retry without it as a fallback.
@@ -81,7 +159,11 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
             width: 480,
             preferInitialWindowPlacement: true,
           });
+          // eslint-disable-next-line no-console
+          console.log(`${LOG_PREFIX} requestWindow success with preferInitialWindowPlacement`);
         } catch {
+          // eslint-disable-next-line no-console
+          console.log(`${LOG_PREFIX} requestWindow retry without preferInitialWindowPlacement`);
           // @ts-expect-error This web API may not be supported by all major browsers.
           pipWindow = await documentPictureInPicture.requestWindow({
             height: 270,
@@ -90,6 +172,8 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
         }
 
         pipWindowRef.current = pipWindow;
+        // eslint-disable-next-line no-console
+        console.log(`${LOG_PREFIX} PiP window created`);
 
         const pipDiv = pipWindow.document.createElement('div');
         pipDiv.setAttribute('id', 'pip-root');
@@ -130,15 +214,25 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           <Pip
             pluginApi={pluginApi}
             pipWindow={pipWindow}
-            intl={intl}
+            intl={safeIntl}
           />,
         );
+        // eslint-disable-next-line no-console
+        console.log(`${LOG_PREFIX} PiP render mounted`);
 
         return true;
       }
 
+      // eslint-disable-next-line no-console
+      console.log(`${LOG_PREFIX} Start skipped`, {
+        isPipSupported,
+        active: pipActiveRef.current,
+        hasMedia: hasMediaRef.current,
+      });
       return false;
     };
+
+    startPipWindowRef.current = startPipWindow;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -171,7 +265,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       // @ts-expect-error This media action may not be supported by all major browsers.
       navigator.mediaSession.setActionHandler('enterpictureinpicture', null);
     };
-  }, [intl, pluginApi]);
+  }, [safeIntl, pluginApi]);
 
   React.useEffect(() => {
     if (!isPipSupported || !pipActive) return undefined;
@@ -209,7 +303,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           boxShadow: 'none',
           contentFunction: (element: HTMLElement) => {
             const root = ReactDOM.createRoot(element);
-            root.render(<FocusWarning intl={intl} />);
+            root.render(<FocusWarning intl={safeIntl} />);
             return root;
           },
         }),
@@ -219,7 +313,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     return () => {
       pluginApi.setFloatingWindows([]);
     };
-  }, [showFocusWarning, pluginApi, pipActive]);
+  }, [showFocusWarning, pluginApi, pipActive, safeIntl]);
 
   return null;
 }

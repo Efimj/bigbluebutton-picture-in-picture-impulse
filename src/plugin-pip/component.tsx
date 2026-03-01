@@ -48,10 +48,11 @@ function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactN
   const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
 
-  const presenter = currentUser?.presenter;
-  const moderator = currentUser?.role && currentUser.role === 'MODERATOR';
-  const hasWebcams = webcams?.user_camera && Boolean(webcams?.user_camera.length);
-  const hasScreenshare = screenshare?.screenshare && Boolean(screenshare?.screenshare.length);
+  // Force strict booleans so layout can render even when hook payload is partial.
+  const presenter = Boolean(currentUser?.presenter);
+  const moderator = currentUser?.role === 'MODERATOR';
+  const hasWebcams = Boolean(webcams?.user_camera?.length);
+  const hasScreenshare = Boolean(screenshare?.screenshare?.length);
 
   const containerClassName = ['container'];
 
