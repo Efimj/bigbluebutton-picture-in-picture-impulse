@@ -1,8 +1,7 @@
 import * as React from 'react';
-import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { defineMessages, IntlShape } from 'react-intl';
 import { useToast } from '../ui/toast';
-import { CHAT_MESSAGE_STREAM, type ChatMessageStreamResponse, type Message } from './queries';
+import { getChatMessageKey, type Message } from './queries';
 
 const intlMessages = defineMessages({
   unknownUser: {
@@ -13,7 +12,7 @@ const intlMessages = defineMessages({
 
 interface ChatNotifierProps {
   intl: IntlShape;
-  pluginApi: PluginApi;
+  messages: Message[];
 }
 
 interface ChatMessageToastProps {
@@ -104,32 +103,29 @@ function ChatMessageToast({ intl, message }: ChatMessageToastProps): React.React
           </div>
         )}
       </div>
-      {/* eslint-disable-next-line react/no-danger */}
-      <div style={messageStyles} dangerouslySetInnerHTML={{ __html: message.messageAsHtml }} />
+      {/* eslint-disable react/no-danger */}
+      <div
+        style={messageStyles}
+        dangerouslySetInnerHTML={{ __html: message.messageAsHtml || message.message }}
+      />
+      {/* eslint-enable react/no-danger */}
     </div>
   );
 }
 
-function ChatNotifier({ intl, pluginApi }: ChatNotifierProps): React.ReactNode {
-  const cursor = React.useRef(new Date());
+function ChatNotifier({ intl, messages }: ChatNotifierProps): React.ReactNode {
   const { showToast } = useToast();
-  const {
-    data: chatMessageStream,
-  } = pluginApi.useCustomSubscription<ChatMessageStreamResponse>(
-    CHAT_MESSAGE_STREAM,
-    {
-      variables: {
-        createdAt: cursor.current.toISOString(),
-      },
-    },
-  );
+  const shownMessageKeysRef = React.useRef<Set<string>>(new Set());
 
   React.useEffect(() => {
-    if (!chatMessageStream?.chat_message_stream) return;
-    chatMessageStream.chat_message_stream.forEach((msg) => {
+    messages.forEach((msg) => {
+      const key = getChatMessageKey(msg);
+      if (shownMessageKeysRef.current.has(key)) return;
+
+      shownMessageKeysRef.current.add(key);
       showToast(<ChatMessageToast intl={intl} message={msg} />, 'default', 10000);
     });
-  }, [chatMessageStream, showToast]);
+  }, [intl, messages, showToast]);
 
   return null;
 }

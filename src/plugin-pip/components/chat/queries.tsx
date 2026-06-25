@@ -31,6 +31,21 @@ export interface Message {
   senderId: string | null;
 }
 
+export type ChatMessage = Omit<Message, 'messageMetadata'> | Message;
+
+export const getChatMessageKey = (msg: ChatMessage): string => (
+  [
+    msg.messageId || 'no-message-id',
+    msg.createdAt || '',
+    msg.senderId || msg.senderName || '',
+    msg.messageAsHtml || msg.message || '',
+  ].join('|')
+);
+
+export const sortChatMessages = <T extends ChatMessage>(messages: T[]): T[] => (
+  [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+);
+
 export interface ChatMessageStreamResponse {
   chat_message_stream: Array<Message>;
 }

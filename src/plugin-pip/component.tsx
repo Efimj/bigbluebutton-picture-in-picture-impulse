@@ -8,6 +8,8 @@ import ChatNotifier from './components/chat/notifier';
 import ChatPanel from './components/chat/panel';
 import RaisedHandNotifier from './components/raised-hands/component';
 import { ToastProvider } from './components/ui/toast';
+import { useChatMessageStream } from './components/chat/hooks';
+import { ChatMessage } from './components/chat/queries';
 import { useVideoStreams } from './components/cameras/hooks';
 import { useScreenshare } from './components/screenshare/hooks';
 import { PipWindowProvider } from './components/contexts/pip-window';
@@ -19,7 +21,15 @@ interface PluginPipProps {
   pipWindow: Window;
 }
 
-function PluginPipInner({ intl, pluginApi }: Omit<PluginPipProps, 'pipWindow'>): React.ReactNode {
+interface PluginPipInnerProps {
+  intl: IntlShape;
+  pluginApi: PluginApi;
+  streamMessages: ChatMessage[];
+}
+
+function PluginPipInner({
+  intl, pluginApi, streamMessages,
+}: PluginPipInnerProps): React.ReactNode {
   const [chatOpen, setChatOpen] = React.useState(false);
   const { actions } = useLayoutContext();
 
@@ -37,6 +47,7 @@ function PluginPipInner({ intl, pluginApi }: Omit<PluginPipProps, 'pipWindow'>):
           pluginApi={pluginApi}
           onClose={() => setChatOpen(false)}
           actionsHeight={actions.height}
+          streamMessages={streamMessages}
         />
       )}
     </>
@@ -47,6 +58,7 @@ function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactN
   const { data: currentUser } = pluginApi.useCurrentUser();
   const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
+  const { latestStreamMessages, streamMessages } = useChatMessageStream(pluginApi);
 
   // Force strict booleans so layout can render even when hook payload is partial.
   const presenter = Boolean(currentUser?.presenter);
@@ -73,9 +85,9 @@ function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactN
               <ScreenshareComponent pluginApi={pluginApi} />
               <CamerasComponent pluginApi={pluginApi} />
             </div>
-            <PluginPipInner intl={intl} pluginApi={pluginApi} />
+            <PluginPipInner intl={intl} pluginApi={pluginApi} streamMessages={streamMessages} />
           </div>
-          <ChatNotifier intl={intl} pluginApi={pluginApi} />
+          <ChatNotifier intl={intl} messages={latestStreamMessages} />
           {presenter && <RaisedHandNotifier intl={intl} pluginApi={pluginApi} />}
           <div id="modals-root" style={{ zIndex: 9999 }} />
         </ToastProvider>

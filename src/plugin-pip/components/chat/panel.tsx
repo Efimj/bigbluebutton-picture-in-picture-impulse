@@ -5,9 +5,9 @@ import {
   CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION,
   CHAT_ALL_MESSAGES_SUBSCRIPTION,
   ChatAllMessagesResponse,
-  CHAT_MESSAGE_STREAM,
-  ChatMessageStreamResponse,
-  Message,
+  ChatMessage,
+  getChatMessageKey,
+  sortChatMessages,
 } from './queries';
 
 const intlMessages = defineMessages({
@@ -35,15 +35,13 @@ interface ChatPanelProps {
   onClose: () => void;
   /** Bottom offset in px to leave the actions bar visible */
   actionsHeight: number;
+  streamMessages: ChatMessage[];
 }
 
 function ChatPanel({
-  intl, pluginApi, onClose, actionsHeight,
+  intl, pluginApi, onClose, actionsHeight, streamMessages,
 }: ChatPanelProps): React.ReactNode {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
-  const streamCursorRef = React.useRef(new Date().toISOString());
-  type PanelMessage = Omit<Message, 'messageMetadata'> | Message;
-  const [streamHistory, setStreamHistory] = React.useState<PanelMessage[]>([]);
 
   const { data } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
     CHAT_ALL_MESSAGES_SUBSCRIPTION,
@@ -51,53 +49,21 @@ function ChatPanel({
   const { data: fallbackData } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
     CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION,
   );
-  const { data: streamData } = pluginApi.useCustomSubscription!<ChatMessageStreamResponse>(
-    CHAT_MESSAGE_STREAM,
-    {
-      variables: {
-        createdAt: streamCursorRef.current,
-      },
-    },
-  );
 
   const publicMessages = data?.chat_message ?? [];
   const fallbackMessages = fallbackData?.chat_message ?? [];
-  const streamMessages = streamData?.chat_message_stream ?? [];
 
-  const getMessageKey = React.useCallback((msg: PanelMessage) => (
-    [
-      msg.messageId || 'no-message-id',
-      msg.createdAt || '',
-      msg.senderId || msg.senderName || '',
-      msg.messageAsHtml || msg.message || '',
-    ].join('|')
-  ), []);
-
-  React.useEffect(() => {
-    if (!streamMessages.length) return;
-
-    setStreamHistory((prev) => {
-      const byId = new Map<string, PanelMessage>();
-      [...prev, ...streamMessages].forEach((msg) => {
-        byId.set(getMessageKey(msg), msg);
-      });
-      return Array.from(byId.values())
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    });
-  }, [streamMessages, getMessageKey]);
-
-  const messages = React.useMemo<PanelMessage[]>(() => {
+  const messages = React.useMemo<ChatMessage[]>(() => {
     const baseMessages = publicMessages.length > 0 ? publicMessages : fallbackMessages;
-    const merged = [...baseMessages, ...streamHistory];
+    const merged = [...baseMessages, ...streamMessages];
 
-    const byId = new Map<string, PanelMessage>();
+    const byId = new Map<string, ChatMessage>();
     merged.forEach((msg) => {
-      byId.set(getMessageKey(msg), msg);
+      byId.set(getChatMessageKey(msg), msg);
     });
 
-    return Array.from(byId.values())
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [publicMessages, fallbackMessages, streamHistory, getMessageKey]);
+    return sortChatMessages(Array.from(byId.values()));
+  }, [publicMessages, fallbackMessages, streamMessages]);
 
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -114,7 +80,7 @@ function ChatPanel({
     return name.substring(0, 2);
   };
 
-  const isSystemMessage = (msg: PanelMessage) => {
+  const isSystemMessage = (msg: ChatMessage) => {
     // Some deployments send user chat with different messageType values.
     // If a sender exists, treat it as a regular user message.
     const hasAuthor = Boolean(msg.senderName || msg.senderId);
@@ -148,7 +114,10 @@ function ChatPanel({
           flexShrink: 0,
         }}
       >
-        <span style={{ color: '#fff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{
+          color: '#fff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px',
+        }}
+        >
           <i className="icon-bbb-group_chat" />
           {intl.formatMessage(intlMessages.title)}
         </span>
@@ -199,7 +168,7 @@ function ChatPanel({
           if (isSystemMessage(msg)) {
             return (
               <div
-                key={getMessageKey(msg)}
+                key={getChatMessageKey(msg)}
                 style={{
                   textAlign: 'center',
                   fontSize: '10px',
@@ -215,7 +184,7 @@ function ChatPanel({
           const senderName = msg.senderName || intl.formatMessage(intlMessages.unknownUser);
 
           return (
-            <div key={getMessageKey(msg)} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+            <div key={getChatMessageKey(msg)} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
               {/* Avatar */}
               <div
                 style={{
@@ -264,7 +233,7 @@ function ChatPanel({
                     </span>
                   )}
                 </div>
-                {/* eslint-disable-next-line react/no-danger */}
+                {/* eslint-disable react/no-danger */}
                 <div
                   style={{
                     fontSize: '12px',
@@ -274,6 +243,7 @@ function ChatPanel({
                   }}
                   dangerouslySetInnerHTML={{ __html: msg.messageAsHtml || msg.message }}
                 />
+                {/* eslint-enable react/no-danger */}
               </div>
             </div>
           );
