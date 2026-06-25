@@ -13,7 +13,6 @@ const intlMessages = defineMessages({
 interface ChatNotifierProps {
   intl: IntlShape;
   messages: Message[];
-  onMessagesReceived: (messages: Message[]) => void;
 }
 
 interface ChatMessageToastProps {
@@ -114,15 +113,11 @@ function ChatMessageToast({ intl, message }: ChatMessageToastProps): React.React
   );
 }
 
-function ChatNotifier({
-  intl, messages, onMessagesReceived,
-}: ChatNotifierProps): React.ReactNode {
+function ChatNotifier({ intl, messages }: ChatNotifierProps): React.ReactNode {
   const { showToast } = useToast();
   const shownMessageKeysRef = React.useRef<Set<string>>(new Set());
 
   React.useEffect(() => {
-    onMessagesReceived(messages);
-
     messages.forEach((msg) => {
       const key = getChatMessageKey(msg);
       if (shownMessageKeysRef.current.has(key)) return;
@@ -130,7 +125,7 @@ function ChatNotifier({
       shownMessageKeysRef.current.add(key);
       showToast(<ChatMessageToast intl={intl} message={msg} />, 'default', 10000);
     });
-  }, [intl, messages, onMessagesReceived, showToast]);
+  }, [intl, messages, showToast]);
 
   return null;
 }

@@ -12,7 +12,6 @@ import {
 interface ChatMessageStreamState {
   latestStreamMessages: Message[];
   streamMessages: ChatMessage[];
-  appendStreamMessages: (messages: ChatMessage[]) => void;
 }
 
 export function useChatMessageStream(pluginApi: PluginApi): ChatMessageStreamState {
@@ -61,8 +60,7 @@ export function useChatMessageStream(pluginApi: PluginApi): ChatMessageStreamSta
     () => ({
       latestStreamMessages,
       streamMessages,
-      appendStreamMessages,
     }),
-    [appendStreamMessages, latestStreamMessages, streamMessages],
+    [latestStreamMessages, streamMessages],
   );
 }

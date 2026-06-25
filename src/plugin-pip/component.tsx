@@ -58,11 +58,7 @@ function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactN
   const { data: currentUser } = pluginApi.useCurrentUser();
   const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
-  const {
-    appendStreamMessages,
-    latestStreamMessages,
-    streamMessages,
-  } = useChatMessageStream(pluginApi);
+  const { latestStreamMessages, streamMessages } = useChatMessageStream(pluginApi);
 
   // Force strict booleans so layout can render even when hook payload is partial.
   const presenter = Boolean(currentUser?.presenter);
@@ -91,11 +87,7 @@ function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactN
             </div>
             <PluginPipInner intl={intl} pluginApi={pluginApi} streamMessages={streamMessages} />
           </div>
-          <ChatNotifier
-            intl={intl}
-            messages={latestStreamMessages}
-            onMessagesReceived={appendStreamMessages}
-          />
+          <ChatNotifier intl={intl} messages={latestStreamMessages} />
           {presenter && <RaisedHandNotifier intl={intl} pluginApi={pluginApi} />}
           <div id="modals-root" style={{ zIndex: 9999 }} />
         </ToastProvider>

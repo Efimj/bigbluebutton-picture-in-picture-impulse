@@ -27,6 +27,18 @@ const intlMessages = defineMessages({
     id: 'plugin.chat.panel.unknownUser',
     defaultMessage: 'Unknown User',
   },
+  inputLabel: {
+    id: 'plugin.chat.panel.inputLabel',
+    defaultMessage: 'Chat message',
+  },
+  inputPlaceholder: {
+    id: 'plugin.chat.panel.inputPlaceholder',
+    defaultMessage: 'Message',
+  },
+  send: {
+    id: 'plugin.chat.panel.send',
+    defaultMessage: 'Send',
+  },
 });
 
 interface ChatPanelProps {
@@ -42,6 +54,7 @@ function ChatPanel({
   intl, pluginApi, onClose, actionsHeight, streamMessages,
 }: ChatPanelProps): React.ReactNode {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const [draftMessage, setDraftMessage] = React.useState('');
 
   const { data } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
     CHAT_ALL_MESSAGES_SUBSCRIPTION,
@@ -68,6 +81,19 @@ function ChatPanel({
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
+
+  const canSendMessage = Boolean(pluginApi.serverCommands?.chat?.sendPublicChatMessage);
+  const trimmedDraftMessage = draftMessage.trim();
+
+  const handleSendMessage = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!trimmedDraftMessage || !canSendMessage) return;
+
+    pluginApi.serverCommands?.chat.sendPublicChatMessage({
+      textMessageInMarkdownFormat: trimmedDraftMessage,
+    });
+    setDraftMessage('');
+  };
 
   const getRoleColor = (role: string | null): string => {
     if (role === 'MODERATOR') return '#3b82f6';
@@ -251,6 +277,56 @@ function ChatPanel({
 
         <div ref={messagesEndRef} />
       </div>
+
+      <form
+        onSubmit={handleSendMessage}
+        style={{
+          display: 'flex',
+          gap: '6px',
+          padding: '6px 8px',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          flexShrink: 0,
+        }}
+      >
+        <input
+          type="text"
+          value={draftMessage}
+          onChange={(event) => setDraftMessage(event.target.value)}
+          placeholder={intl.formatMessage(intlMessages.inputPlaceholder)}
+          aria-label={intl.formatMessage(intlMessages.inputLabel)}
+          disabled={!canSendMessage}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: '30px',
+            border: '1px solid rgba(255,255,255,0.16)',
+            borderRadius: '4px',
+            backgroundColor: 'rgba(255,255,255,0.08)',
+            color: '#fff',
+            fontSize: '12px',
+            padding: '0 8px',
+            outline: 'none',
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!trimmedDraftMessage || !canSendMessage}
+          style={{
+            height: '30px',
+            minWidth: '54px',
+            border: 'none',
+            borderRadius: '4px',
+            backgroundColor: trimmedDraftMessage && canSendMessage ? '#3b82f6' : 'rgba(255,255,255,0.12)',
+            color: '#fff',
+            cursor: trimmedDraftMessage && canSendMessage ? 'pointer' : 'default',
+            fontSize: '12px',
+            fontWeight: 600,
+            padding: '0 10px',
+          }}
+        >
+          {intl.formatMessage(intlMessages.send)}
+        </button>
+      </form>
     </div>
   );
 }
