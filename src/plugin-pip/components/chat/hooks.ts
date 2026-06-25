@@ -12,6 +12,7 @@ import {
 interface ChatMessageStreamState {
   latestStreamMessages: Message[];
   streamMessages: ChatMessage[];
+  appendStreamMessages: (messages: ChatMessage[]) => void;
 }
 
 export function useChatMessageStream(pluginApi: PluginApi): ChatMessageStreamState {
@@ -29,8 +30,8 @@ export function useChatMessageStream(pluginApi: PluginApi): ChatMessageStreamSta
 
   const latestStreamMessages = streamData?.chat_message_stream ?? [];
 
-  React.useEffect(() => {
-    if (!latestStreamMessages.length) return;
+  const appendStreamMessages = React.useCallback((messages: ChatMessage[]) => {
+    if (!messages.length) return;
 
     setStreamMessages((prev) => {
       const byId = new Map<string, ChatMessage>();
@@ -40,7 +41,7 @@ export function useChatMessageStream(pluginApi: PluginApi): ChatMessageStreamSta
         byId.set(getChatMessageKey(msg), msg);
       });
 
-      latestStreamMessages.forEach((msg) => {
+      messages.forEach((msg) => {
         const key = getChatMessageKey(msg);
         if (!byId.has(key)) changed = true;
         byId.set(key, msg);
@@ -50,13 +51,18 @@ export function useChatMessageStream(pluginApi: PluginApi): ChatMessageStreamSta
 
       return sortChatMessages(Array.from(byId.values()));
     });
-  }, [latestStreamMessages]);
+  }, []);
+
+  React.useEffect(() => {
+    appendStreamMessages(latestStreamMessages);
+  }, [appendStreamMessages, latestStreamMessages]);
 
   return React.useMemo(
     () => ({
       latestStreamMessages,
       streamMessages,
+      appendStreamMessages,
     }),
-    [latestStreamMessages, streamMessages],
+    [appendStreamMessages, latestStreamMessages, streamMessages],
   );
 }
