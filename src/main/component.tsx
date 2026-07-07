@@ -14,6 +14,14 @@ import styles from './stylesheet';
 const isPipSupported = 'documentPictureInPicture' in window;
 const LOG_PREFIX = '[PiP Plugin]';
 
+function isMobileOrTabletDevice() {
+  const userAgent = navigator.userAgent || '';
+  const mobileOrTabletPattern = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i;
+  const isTouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+  return mobileOrTabletPattern.test(userAgent) || isTouchMac;
+}
+
 const intlMessages = defineMessages({
   activate: {
     id: 'plugin.pip.activate',
@@ -33,6 +41,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
   const { intl } = useI18n(pluginApi);
+  const isMobileOrTablet = React.useMemo(() => isMobileOrTabletDevice(), []);
   const fallbackIntl = React.useMemo(() => ({
     formatMessage: (
       descriptor: { defaultMessage?: string; id?: string } | null | undefined,
@@ -75,7 +84,20 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   const { joined: joinedVoice } = useCurrentUserVoice(pluginApi) || {};
   const amISharingWebcam = Boolean(currentUser?.cameras?.length);
 
+  React.useEffect(() => {
+    if (!isMobileOrTablet) return;
+
+    pipActiveRef.current = false;
+    localStorage.setItem('pip-plugin-active', 'false');
+    setPipActive(false);
+    releaseKeepAlive();
+    pipWindowRef.current?.close();
+    pluginApi.setActionButtonDropdownItems([]);
+  }, [isMobileOrTablet, pluginApi]);
+
   const handleTogglePip = React.useCallback(() => {
+    if (isMobileOrTablet) return;
+
     const nextPipActive = !pipActiveRef.current;
     // eslint-disable-next-line no-console
     console.log(`${LOG_PREFIX} Toggle clicked`, {
@@ -108,10 +130,13 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       pipWindowRef.current?.close();
       resumeMainTabVideos();
     }
-  }, []);
+  }, [isMobileOrTablet]);
 
   React.useEffect(() => {
-    if (!isPipSupported) return;
+    if (!isPipSupported || isMobileOrTablet) {
+      pluginApi.setActionButtonDropdownItems([]);
+      return;
+    }
 
     const activateLabel = safeIntl.formatMessage(intlMessages.activate) || 'Activate PiP Window';
     const deactivateLabel = safeIntl.formatMessage(intlMessages.deactivate) || 'Deactivate PiP Window';
@@ -127,11 +152,11 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
         tooltip: pipActive ? deactivateLabel : activateLabel,
       }),
     ]);
-  }, [safeIntl, pipActive, pluginApi, handleTogglePip]);
+  }, [safeIntl, pipActive, pluginApi, handleTogglePip, isMobileOrTablet]);
 
   React.useEffect(() => {
     const startPipWindow = async () => {
-      if (isPipSupported && pipActiveRef.current) {
+      if (isPipSupported && !isMobileOrTablet && pipActiveRef.current) {
         // eslint-disable-next-line no-console
         console.log(`${LOG_PREFIX} Start requested`, {
           source: 'startPipWindow',
@@ -226,6 +251,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       // eslint-disable-next-line no-console
       console.log(`${LOG_PREFIX} Start skipped`, {
         isPipSupported,
+        isMobileOrTablet,
         active: pipActiveRef.current,
         hasMedia: hasMediaRef.current,
       });
@@ -265,10 +291,10 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       // @ts-expect-error This media action may not be supported by all major browsers.
       navigator.mediaSession.setActionHandler('enterpictureinpicture', null);
     };
-  }, [safeIntl, pluginApi]);
+  }, [safeIntl, pluginApi, isMobileOrTablet]);
 
   React.useEffect(() => {
-    if (!isPipSupported || !pipActive) return undefined;
+    if (!isPipSupported || isMobileOrTablet || !pipActive) return undefined;
 
     function handleVisibilityChange() {
       setShowFocusWarning(!document.hidden && !amISharingWebcam && !joinedVoice);
@@ -285,10 +311,10 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('click', handleFocus, { capture: true });
     };
-  }, [pipActive, amISharingWebcam, joinedVoice]);
+  }, [pipActive, amISharingWebcam, joinedVoice, isMobileOrTablet]);
 
   React.useEffect(() => {
-    if (!isPipSupported || !pipActive) return undefined;
+    if (!isPipSupported || isMobileOrTablet || !pipActive) return undefined;
 
     if (showFocusWarning) {
       const actionsButton = document.querySelector('[data-test="actionsButton"]');
@@ -313,7 +339,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     return () => {
       pluginApi.setFloatingWindows([]);
     };
-  }, [showFocusWarning, pluginApi, pipActive, safeIntl]);
+  }, [showFocusWarning, pluginApi, pipActive, safeIntl, isMobileOrTablet]);
 
   return null;
 }
