@@ -22,10 +22,11 @@ module.exports = {
       'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization, ngrok-skip-browser-warning',
     },
     liveReload: false,
-    client: {
-      overlay: false,
-    },
-    onBeforeSetupMiddleware: (devServer) => {
+    // The bundle is served through the BBB nginx proxy. Disable the dev-server
+    // browser client so it does not try to connect directly to the private
+    // development port (wss://bbb-host:4701/ws).
+    client: false,
+    setupMiddlewares: (middlewares, devServer) => {
       if (!devServer) {
         throw new Error('webpack-dev-server is not defined');
       }
@@ -34,6 +35,8 @@ module.exports = {
       devServer.app.get('/manifest.json', (req, res) => {
         res.sendFile(path.resolve(__dirname, 'manifest.json'));
       });
+
+      return middlewares;
     },
   },
   module: {

@@ -48,10 +48,10 @@ export function LayoutProvider({
     // Some Chromium forks can return 0x0 for inner size in Document PiP.
     const width = pipWindow.innerWidth
       || pipWindow.document.documentElement.clientWidth
-      || 480;
+      || 350;
     const height = pipWindow.innerHeight
       || pipWindow.document.documentElement.clientHeight
-      || 270;
+      || 480;
 
     const actionsHeight = 56;
     const actionsRect: Rect = {
@@ -71,18 +71,33 @@ export function LayoutProvider({
     };
 
     if (hasScreenshareEnabled && hasCamerasEnabled) {
-      screenshareRect = {
-        x: 0,
-        y: 0,
-        width: width * 0.7,
-        height: availableHeight,
-      };
-      camerasRect = {
-        x: width * 0.7,
-        y: 0,
-        width: width * 0.3,
-        height: availableHeight,
-      };
+      if (height > width) {
+        screenshareRect = {
+          x: 0,
+          y: 0,
+          width,
+          height: availableHeight * 0.7,
+        };
+        camerasRect = {
+          x: 0,
+          y: availableHeight * 0.7,
+          width,
+          height: availableHeight * 0.3,
+        };
+      } else {
+        screenshareRect = {
+          x: 0,
+          y: 0,
+          width: width * 0.7,
+          height: availableHeight,
+        };
+        camerasRect = {
+          x: width * 0.7,
+          y: 0,
+          width: width * 0.3,
+          height: availableHeight,
+        };
+      }
     } else if (hasScreenshareEnabled) {
       screenshareRect = {
         x: 0,

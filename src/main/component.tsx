@@ -1,6 +1,11 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
-import { ActionButtonDropdownOption, BbbPluginSdk, FloatingWindow } from 'bigbluebutton-html-plugin-sdk';
+import {
+  ActionsBarButton,
+  ActionsBarPosition,
+  BbbPluginSdk,
+  FloatingWindow,
+} from 'bigbluebutton-html-plugin-sdk';
 import { defineMessages, IntlShape } from 'react-intl';
 import { useI18n } from '../common/hooks';
 import { acquireKeepAlive, releaseKeepAlive, resumeMainTabVideos } from '../common/keep-alive';
@@ -13,6 +18,8 @@ import styles from './stylesheet';
 
 const isPipSupported = 'documentPictureInPicture' in window;
 const LOG_PREFIX = '[PiP Plugin]';
+const PIP_WINDOW_WIDTH = 350;
+const PIP_WINDOW_HEIGHT = 480;
 
 function isMobileOrTabletDevice() {
   const userAgent = navigator.userAgent || '';
@@ -61,18 +68,24 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     },
   }) as unknown as IntlShape, []);
   const safeIntl = intl || fallbackIntl;
-  const initialPipActive = React.useMemo(() => {
+  const initialAutoPipEnabled = React.useMemo(() => {
     try {
-      return JSON.parse(localStorage.getItem('pip-plugin-active') || 'false') === true;
+      const storedValue = localStorage.getItem('pip-plugin-active');
+
+      // Auto-PiP is enabled by default. The toolbar button lets the user opt out
+      // and keeps that preference for future meetings.
+      return storedValue === null || JSON.parse(storedValue) === true;
     } catch {
-      return false;
+      return true;
     }
   }, []);
-  const pipActiveRef = React.useRef<boolean>(initialPipActive);
+  const autoPipEnabledRef = React.useRef<boolean>(initialAutoPipEnabled);
   const pipWindowRef = React.useRef<Window | null>(null);
+  const pipRequestRef = React.useRef<Promise<boolean> | null>(null);
   const startPipWindowRef = React.useRef<() => Promise<boolean>>(async () => false);
   const hasMediaRef = React.useRef(false);
-  const [pipActive, setPipActive] = React.useState<boolean>(initialPipActive);
+  const [autoPipEnabled, setAutoPipEnabled] = React.useState<boolean>(initialAutoPipEnabled);
+  const [pipWindowOpen, setPipWindowOpen] = React.useState(false);
   const [showFocusWarning, setShowFocusWarning] = React.useState(false);
   const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
@@ -87,80 +100,99 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
   React.useEffect(() => {
     if (!isMobileOrTablet) return;
 
-    pipActiveRef.current = false;
+    autoPipEnabledRef.current = false;
     localStorage.setItem('pip-plugin-active', 'false');
-    setPipActive(false);
+    setAutoPipEnabled(false);
+    setPipWindowOpen(false);
     releaseKeepAlive();
     pipWindowRef.current?.close();
-    pluginApi.setActionButtonDropdownItems([]);
+    pluginApi.setActionsBarItems([]);
   }, [isMobileOrTablet, pluginApi]);
 
   const handleTogglePip = React.useCallback(() => {
     if (isMobileOrTablet) return;
 
-    const nextPipActive = !pipActiveRef.current;
+    // The persisted auto-PiP preference and the actual window state are separate.
+    // When no window exists, a toolbar click must always open one from this user gesture.
+    // When a window exists, the same click closes it and opts out of automatic reopening.
+    const currentPipWindow = pipWindowRef.current
+      // @ts-expect-error This web API may not be supported by all major browsers.
+      || (isPipSupported ? documentPictureInPicture.window : null);
+    const shouldOpen = !currentPipWindow;
     // eslint-disable-next-line no-console
     console.log(`${LOG_PREFIX} Toggle clicked`, {
-      current: pipActiveRef.current,
-      next: nextPipActive,
+      autoPipEnabled: autoPipEnabledRef.current,
+      pipWindowOpen: Boolean(currentPipWindow),
+      action: shouldOpen ? 'open' : 'close',
       isPipSupported,
       hasMedia: hasMediaRef.current,
     });
-    pipActiveRef.current = nextPipActive;
-    localStorage.setItem('pip-plugin-active', JSON.stringify(nextPipActive));
-    setPipActive(nextPipActive);
 
-    if (nextPipActive) {
+    if (shouldOpen) {
+      autoPipEnabledRef.current = true;
+      localStorage.setItem('pip-plugin-active', 'true');
+      setAutoPipEnabled(true);
       // Try to open PiP from a direct user gesture (more reliable in some browsers).
       // eslint-disable-next-line no-console
       startPipWindowRef.current()
         .then((started) => {
           // eslint-disable-next-line no-console
           console.log(`${LOG_PREFIX} Toggle start result`, { started });
-          if (started) console.info('PiP window started by action button');
         })
         .catch((error) => {
           // eslint-disable-next-line no-console
           console.error(`${LOG_PREFIX} Toggle start failed`, error);
         });
     } else {
+      autoPipEnabledRef.current = false;
+      localStorage.setItem('pip-plugin-active', 'false');
+      setAutoPipEnabled(false);
+      setPipWindowOpen(false);
       // eslint-disable-next-line no-console
       console.log(`${LOG_PREFIX} Toggle deactivated: closing PiP`);
       releaseKeepAlive();
-      pipWindowRef.current?.close();
+      currentPipWindow.close();
+      pipWindowRef.current = null;
       resumeMainTabVideos();
     }
   }, [isMobileOrTablet]);
 
   React.useEffect(() => {
-    if (!isPipSupported || isMobileOrTablet) {
-      pluginApi.setActionButtonDropdownItems([]);
-      return;
+    if (isMobileOrTablet) {
+      pluginApi.setActionsBarItems([]);
+      return undefined;
     }
 
     const activateLabel = safeIntl.formatMessage(intlMessages.activate) || 'Activate PiP Window';
     const deactivateLabel = safeIntl.formatMessage(intlMessages.deactivate) || 'Deactivate PiP Window';
 
-    pluginApi.setActionButtonDropdownItems([
-      new ActionButtonDropdownOption({
+    pluginApi.setActionsBarItems([
+      new ActionsBarButton({
         id: 'plugin-pip-toggle',
         dataTest: 'plugin-pip-toggle',
-        allowed: true,
-        icon: pipActive ? 'desktop_off' : 'desktop',
-        label: pipActive ? deactivateLabel : activateLabel,
+        position: ActionsBarPosition.RIGHT,
+        icon: { iconName: pipWindowOpen ? 'desktop_off' : 'desktop' },
+        label: pipWindowOpen ? deactivateLabel : activateLabel,
         onClick: handleTogglePip,
-        tooltip: pipActive ? deactivateLabel : activateLabel,
+        tooltip: pipWindowOpen ? deactivateLabel : activateLabel,
+        circle: true,
+        hideLabel: true,
+        size: 'lg',
       }),
     ]);
-  }, [safeIntl, pipActive, pluginApi, handleTogglePip, isMobileOrTablet]);
+
+    return undefined;
+  }, [safeIntl, pipWindowOpen, pluginApi, handleTogglePip, isMobileOrTablet]);
 
   React.useEffect(() => {
-    const startPipWindow = async () => {
-      if (isPipSupported && !isMobileOrTablet && pipActiveRef.current) {
+    const startPipWindow = async (): Promise<boolean> => {
+      if (pipRequestRef.current) return pipRequestRef.current;
+
+      if (isPipSupported && !isMobileOrTablet && autoPipEnabledRef.current) {
         // eslint-disable-next-line no-console
         console.log(`${LOG_PREFIX} Start requested`, {
           source: 'startPipWindow',
-          active: pipActiveRef.current,
+          autoPipEnabled: autoPipEnabledRef.current,
           hasMedia: hasMediaRef.current,
         });
         if (!hasMediaRef.current) {
@@ -174,85 +206,104 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           return false;
         }
 
-        // Some Chromium-based browsers (e.g. Yandex Browser) may not support
-        // the preferInitialWindowPlacement option — retry without it as a fallback.
-        let pipWindow: Window;
+        const pipRequest = (async () => {
+          // Some Chromium-based browsers (e.g. Yandex Browser) may not support
+          // the preferInitialWindowPlacement option — retry without it as a fallback.
+          let pipWindow: Window;
+          try {
+            // @ts-expect-error This web API may not be supported by all major browsers.
+            pipWindow = await documentPictureInPicture.requestWindow({
+              height: PIP_WINDOW_HEIGHT,
+              width: PIP_WINDOW_WIDTH,
+              // Ask Chrome to use its default PiP placement (normally bottom-right)
+              // instead of restoring a position previously chosen by the user.
+              preferInitialWindowPlacement: true,
+            });
+            // eslint-disable-next-line no-console
+            console.log(`${LOG_PREFIX} requestWindow success with preferInitialWindowPlacement`);
+          } catch (error) {
+            // A missing user activation or disabled API cannot be fixed by retrying
+            // with a different options object.
+            if (error instanceof DOMException
+              && (error.name === 'NotAllowedError' || error.name === 'NotSupportedError')) {
+              throw error;
+            }
+            // eslint-disable-next-line no-console
+            console.log(`${LOG_PREFIX} requestWindow retry without preferInitialWindowPlacement`);
+            // @ts-expect-error This web API may not be supported by all major browsers.
+            pipWindow = await documentPictureInPicture.requestWindow({
+              height: PIP_WINDOW_HEIGHT,
+              width: PIP_WINDOW_WIDTH,
+            });
+          }
+
+          pipWindowRef.current = pipWindow;
+          setPipWindowOpen(true);
+          // eslint-disable-next-line no-console
+          console.log(`${LOG_PREFIX} PiP window created`);
+
+          const pipDiv = pipWindow.document.createElement('div');
+          pipDiv.setAttribute('id', 'pip-root');
+          pipWindow.document.body.append(pipDiv);
+          const pipRoot = ReactDOM.createRoot(pipWindow.document.getElementById('pip-root'));
+
+          const handlePageHide = () => {
+            pipWindowRef.current = null;
+            setPipWindowOpen(false);
+            releaseKeepAlive();
+            pipRoot.unmount();
+          };
+
+          pipWindow.addEventListener('pagehide', handlePageHide);
+
+          const style = document.createElement('style');
+          style.textContent = styles.toString();
+          pipWindow.document.head.appendChild(style);
+
+          const normalize = document.createElement('link');
+          normalize.rel = 'stylesheet';
+          normalize.type = 'text/css';
+          normalize.href = 'stylesheets/normalize.css';
+          pipWindow.document.head.appendChild(normalize);
+
+          const icons = document.createElement('link');
+          icons.rel = 'stylesheet';
+          icons.type = 'text/css';
+          icons.href = 'stylesheets/bbb-icons.css';
+          pipWindow.document.head.appendChild(icons);
+
+          const fonts = document.createElement('link');
+          fonts.rel = 'stylesheet';
+          fonts.type = 'text/css';
+          fonts.href = 'stylesheets/bbb-icons.css';
+          pipWindow.document.head.appendChild(fonts);
+
+          pipRoot.render(
+            <Pip
+              pluginApi={pluginApi}
+              pipWindow={pipWindow}
+              intl={safeIntl}
+            />,
+          );
+          // eslint-disable-next-line no-console
+          console.log(`${LOG_PREFIX} PiP render mounted`);
+
+          return true;
+        })();
+
+        pipRequestRef.current = pipRequest;
         try {
-          // @ts-expect-error This web API may not be supported by all major browsers.
-          pipWindow = await documentPictureInPicture.requestWindow({
-            height: 270,
-            width: 480,
-            preferInitialWindowPlacement: true,
-          });
-          // eslint-disable-next-line no-console
-          console.log(`${LOG_PREFIX} requestWindow success with preferInitialWindowPlacement`);
-        } catch {
-          // eslint-disable-next-line no-console
-          console.log(`${LOG_PREFIX} requestWindow retry without preferInitialWindowPlacement`);
-          // @ts-expect-error This web API may not be supported by all major browsers.
-          pipWindow = await documentPictureInPicture.requestWindow({
-            height: 270,
-            width: 480,
-          });
+          return await pipRequest;
+        } finally {
+          if (pipRequestRef.current === pipRequest) pipRequestRef.current = null;
         }
-
-        pipWindowRef.current = pipWindow;
-        // eslint-disable-next-line no-console
-        console.log(`${LOG_PREFIX} PiP window created`);
-
-        const pipDiv = pipWindow.document.createElement('div');
-        pipDiv.setAttribute('id', 'pip-root');
-        pipWindow.document.body.append(pipDiv);
-        const pipRoot = ReactDOM.createRoot(pipWindow.document.getElementById('pip-root'));
-
-        const handlePageHide = () => {
-          pipWindowRef.current = null;
-          releaseKeepAlive();
-          pipRoot.unmount();
-        };
-
-        pipWindow.addEventListener('pagehide', handlePageHide);
-
-        const style = document.createElement('style');
-        style.textContent = styles.toString();
-        pipWindow.document.head.appendChild(style);
-
-        const normalize = document.createElement('link');
-        normalize.rel = 'stylesheet';
-        normalize.type = 'text/css';
-        normalize.href = 'stylesheets/normalize.css';
-        pipWindow.document.head.appendChild(normalize);
-
-        const icons = document.createElement('link');
-        icons.rel = 'stylesheet';
-        icons.type = 'text/css';
-        icons.href = 'stylesheets/bbb-icons.css';
-        pipWindow.document.head.appendChild(icons);
-
-        const fonts = document.createElement('link');
-        fonts.rel = 'stylesheet';
-        fonts.type = 'text/css';
-        fonts.href = 'stylesheets/bbb-icons.css';
-        pipWindow.document.head.appendChild(fonts);
-
-        pipRoot.render(
-          <Pip
-            pluginApi={pluginApi}
-            pipWindow={pipWindow}
-            intl={safeIntl}
-          />,
-        );
-        // eslint-disable-next-line no-console
-        console.log(`${LOG_PREFIX} PiP render mounted`);
-
-        return true;
       }
 
       // eslint-disable-next-line no-console
       console.log(`${LOG_PREFIX} Start skipped`, {
         isPipSupported,
         isMobileOrTablet,
-        active: pipActiveRef.current,
+        autoPipEnabled: autoPipEnabledRef.current,
         hasMedia: hasMediaRef.current,
       });
       return false;
@@ -263,11 +314,11 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         acquireKeepAlive();
-        // eslint-disable-next-line no-console
-        startPipWindow().then((started) => { if (started) console.info('PiP window started by visibility change'); }).catch(console.warn);
       } else {
         releaseKeepAlive();
         pipWindowRef.current?.close();
+        pipWindowRef.current = null;
+        setPipWindowOpen(false);
         // Force-resume videos in the main tab that may have been paused
         // by the browser while the tab was in the background.
         resumeMainTabVideos();
@@ -275,26 +326,37 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     };
 
     const handleEnterPip = () => {
-      // eslint-disable-next-line no-console
-      startPipWindow().then((started) => { if (started) console.info('PiP window started by PiP action'); }).catch(console.warn);
+      startPipWindow().catch((error) => {
+        // eslint-disable-next-line no-console
+        console.warn(`${LOG_PREFIX} Automatic PiP start failed`, error);
+      });
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // @ts-expect-error This media action may not be supported by all major browsers.
-    navigator.mediaSession.setActionHandler('enterpictureinpicture', handleEnterPip);
+    try {
+      // @ts-expect-error This media action may not be supported by all major browsers.
+      navigator.mediaSession?.setActionHandler('enterpictureinpicture', handleEnterPip);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn(`${LOG_PREFIX} Automatic PiP is not supported by this browser`, error);
+    }
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       releaseKeepAlive();
 
-      // @ts-expect-error This media action may not be supported by all major browsers.
-      navigator.mediaSession.setActionHandler('enterpictureinpicture', null);
+      try {
+        // @ts-expect-error This media action may not be supported by all major browsers.
+        navigator.mediaSession?.setActionHandler('enterpictureinpicture', null);
+      } catch {
+        // The browser did not accept this Media Session action during setup either.
+      }
     };
   }, [safeIntl, pluginApi, isMobileOrTablet]);
 
   React.useEffect(() => {
-    if (!isPipSupported || isMobileOrTablet || !pipActive) return undefined;
+    if (!isPipSupported || isMobileOrTablet || !autoPipEnabled) return undefined;
 
     function handleVisibilityChange() {
       setShowFocusWarning(!document.hidden && !amISharingWebcam && !joinedVoice);
@@ -311,13 +373,14 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('click', handleFocus, { capture: true });
     };
-  }, [pipActive, amISharingWebcam, joinedVoice, isMobileOrTablet]);
+  }, [autoPipEnabled, amISharingWebcam, joinedVoice, isMobileOrTablet]);
 
   React.useEffect(() => {
-    if (!isPipSupported || isMobileOrTablet || !pipActive) return undefined;
+    if (!isPipSupported || isMobileOrTablet || !autoPipEnabled) return undefined;
 
     if (showFocusWarning) {
       const actionsButton = document.querySelector('[data-test="actionsButton"]');
+      if (!actionsButton) return undefined;
       const rect = actionsButton.getBoundingClientRect();
       pluginApi.setFloatingWindows([
         new FloatingWindow({
@@ -339,7 +402,7 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
     return () => {
       pluginApi.setFloatingWindows([]);
     };
-  }, [showFocusWarning, pluginApi, pipActive, safeIntl, isMobileOrTablet]);
+  }, [showFocusWarning, pluginApi, autoPipEnabled, safeIntl, isMobileOrTablet]);
 
   return null;
 }

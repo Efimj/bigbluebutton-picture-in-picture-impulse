@@ -14,10 +14,12 @@ interface ActionsComponentProps {
   pluginApi: PluginApi;
   chatOpen: boolean;
   onChatToggle: () => void;
+  usersOpen: boolean;
+  onUsersToggle: () => void;
 }
 
 function ActionsComponent({
-  intl, pluginApi, chatOpen, onChatToggle,
+  intl, pluginApi, chatOpen, onChatToggle, usersOpen, onUsersToggle,
 }: ActionsComponentProps): React.ReactNode {
   const { actions } = useLayoutContext();
   return (
@@ -52,7 +54,12 @@ function ActionsComponent({
             borderRadius: '6px',
           }}
         />
-        <UsersBadgeComponent intl={intl} pluginApi={pluginApi} />
+        <UsersBadgeComponent
+          intl={intl}
+          pluginApi={pluginApi}
+          open={usersOpen}
+          onToggle={onUsersToggle}
+        />
       </div>
     </div>
   );

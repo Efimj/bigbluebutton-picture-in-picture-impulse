@@ -8,7 +8,7 @@ A plugin that starts up a picture-in-picture window with webcams and screen shar
 
 - **Picture-in-Picture window** - floating window with webcams and screen sharing, auto-opens when you switch tabs
 - **Chat panel** - click the chat button inside the PiP window to open an inline message history panel (toast notifications for new messages are preserved)
-- **User list popover** - click the users badge to see the names of all participants in the session
+- **Participant management** - open the participant panel directly inside PiP, including moderator quick actions and waiting-user admission controls
 - **Audio and webcam controls** - mute/unmute and toggle your webcam directly from the PiP window
 - **Raised hands** - see and lower raised hands without leaving the PiP window
 - **Layout swap** - swap screenshare and webcam positions for presenter view
@@ -49,6 +49,8 @@ This screenshot shows the chat panel with loaded chat messages:
 
 ## Building the Plugin
 
+This branch targets BigBlueButton 4.0 and SDK `0.1.24`. Use Node.js 20.
+
 To build the plugin for production use, follow these steps:
 
 ```bash
@@ -67,11 +69,11 @@ To use the plugin in BigBlueButton, send this parameter along in create call:
 pluginManifests=[{"url":"<your-domain>/path/to/manifest.json"}]
 ```
 
-Or additionally, you can add this same configuration in the `.properties` file from `bbb-web` in `/usr/share/bbb-web/WEB-INF/classes/bigbluebutton.properties`
+Or add the same configuration globally in `/etc/bigbluebutton/bbb-web.properties`.
 
-## Using Prebuilt Files (No Build, Ubuntu)
+## Installing the Production Build (Ubuntu)
 
-If you do not want to build from source, you can use the prebuilt files from the `build` folder.
+Run the build command above, then deploy the generated files from the `dist` folder.
 
 Files to copy:
 
@@ -80,19 +82,24 @@ Files to copy:
 - `manifest.json`
 - `locales/` (entire folder)
 
-Copy them into BigBlueButton assets:
+Copy them into a dedicated BigBlueButton plugin directory:
 
 ```bash
-sudo cp -r build/* /var/www/bigbluebutton-default/assets/
+sudo install -d /var/www/bigbluebutton-default/assets/plugins/bbb-plugin-picture-in-picture
+sudo cp -r dist/* /var/www/bigbluebutton-default/assets/plugins/bbb-plugin-picture-in-picture/
 ```
 
-Then use the manifest URL in your create call:
+Then use the manifest URL in your create call or in `/etc/bigbluebutton/bbb-web.properties`:
 
 ```bash
-pluginManifests=[{"url":"https://<your-domain>/assets/manifest.json"}]
+pluginManifests=[{"url":"https://<your-domain>/plugins/bbb-plugin-picture-in-picture/manifest.json"}]
 ```
 
-If you already use `manifest.json` in `/assets`, place plugin files in a separate subfolder and update `javascriptEntrypointUrl` in that manifest accordingly.
+Restart BBB after changing the global configuration:
+
+```bash
+sudo bbb-conf --restart
+```
 
 ## Development mode
 

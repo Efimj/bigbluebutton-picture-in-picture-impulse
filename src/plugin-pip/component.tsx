@@ -6,6 +6,7 @@ import ActionsComponent from './components/actions/component';
 import ScreenshareComponent from './components/screenshare/component';
 import ChatNotifier from './components/chat/notifier';
 import ChatPanel from './components/chat/panel';
+import UsersPanel from './components/actions/buttons/users/panel';
 import RaisedHandNotifier from './components/raised-hands/component';
 import { ToastProvider } from './components/ui/toast';
 import { useChatMessageStream } from './components/chat/hooks';
@@ -30,7 +31,7 @@ interface PluginPipInnerProps {
 function PluginPipInner({
   intl, pluginApi, streamMessages,
 }: PluginPipInnerProps): React.ReactNode {
-  const [chatOpen, setChatOpen] = React.useState(false);
+  const [openPanel, setOpenPanel] = React.useState<'chat' | 'users' | null>(null);
   const { actions } = useLayoutContext();
 
   return (
@@ -38,16 +39,26 @@ function PluginPipInner({
       <ActionsComponent
         pluginApi={pluginApi}
         intl={intl}
-        chatOpen={chatOpen}
-        onChatToggle={() => setChatOpen((v) => !v)}
+        chatOpen={openPanel === 'chat'}
+        onChatToggle={() => setOpenPanel((panel) => (panel === 'chat' ? null : 'chat'))}
+        usersOpen={openPanel === 'users'}
+        onUsersToggle={() => setOpenPanel((panel) => (panel === 'users' ? null : 'users'))}
       />
-      {chatOpen && (
+      {openPanel === 'chat' && (
         <ChatPanel
           intl={intl}
           pluginApi={pluginApi}
-          onClose={() => setChatOpen(false)}
+          onClose={() => setOpenPanel(null)}
           actionsHeight={actions.height}
           streamMessages={streamMessages}
+        />
+      )}
+      {openPanel === 'users' && (
+        <UsersPanel
+          intl={intl}
+          pluginApi={pluginApi}
+          onClose={() => setOpenPanel(null)}
+          actionsHeight={actions.height}
         />
       )}
     </>
