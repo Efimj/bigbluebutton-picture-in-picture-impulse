@@ -451,10 +451,15 @@ export function PopoverFooter({ children, style }: PopoverFooterProps) {
 
 interface PopoverCloseButtonProps {
   onClose: () => void;
+  ariaLabel: string;
   style?: React.CSSProperties;
 }
 
-export function PopoverCloseButton({ onClose, style }: PopoverCloseButtonProps) {
+export function PopoverCloseButton({
+  onClose,
+  ariaLabel,
+  style,
+}: PopoverCloseButtonProps) {
   const buttonStyles: React.CSSProperties = {
     position: 'absolute',
     top: '8px',
@@ -484,7 +489,7 @@ export function PopoverCloseButton({ onClose, style }: PopoverCloseButtonProps) 
       onClick={onClose}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      aria-label="Close popover"
+      aria-label={ariaLabel}
     >
       <svg
         width="16"
