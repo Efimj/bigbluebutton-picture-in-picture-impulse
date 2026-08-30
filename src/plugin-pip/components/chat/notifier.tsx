@@ -2,11 +2,16 @@ import * as React from 'react';
 import { defineMessages, IntlShape } from 'react-intl';
 import { useToast } from '../ui/toast';
 import { getChatMessageKey, type Message } from './queries';
+import { parseChatAttachments, removeAttachmentMarkersFromHtml } from './attachments';
 
 const intlMessages = defineMessages({
   unknownUser: {
     id: 'plugin.chat.unknownUser',
     defaultMessage: 'Unknown User',
+  },
+  attachedFile: {
+    id: 'plugin.chat.attachment.file',
+    defaultMessage: 'Attached file',
   },
 });
 
@@ -21,6 +26,13 @@ interface ChatMessageToastProps {
 }
 
 function ChatMessageToast({ intl, message }: ChatMessageToastProps): React.ReactElement {
+  const parsedAttachments = parseChatAttachments(message.message);
+  const visibleMessage = removeAttachmentMarkersFromHtml(
+    message.messageAsHtml,
+    parsedAttachments.markerLines,
+  ) || (parsedAttachments.attachments.length > 0
+    ? intl.formatMessage(intlMessages.attachedFile)
+    : '');
   const getRoleColor = (role: string | null): string => {
     const roleColors: Record<string, string> = {
       MODERATOR: '#3b82f6',
@@ -106,7 +118,7 @@ function ChatMessageToast({ intl, message }: ChatMessageToastProps): React.React
       {/* eslint-disable react/no-danger */}
       <div
         style={messageStyles}
-        dangerouslySetInnerHTML={{ __html: message.messageAsHtml || message.message }}
+        dangerouslySetInnerHTML={{ __html: visibleMessage }}
       />
       {/* eslint-enable react/no-danger */}
     </div>

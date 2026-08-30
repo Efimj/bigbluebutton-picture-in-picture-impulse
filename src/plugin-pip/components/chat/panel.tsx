@@ -11,6 +11,17 @@ import {
   getChatMessageKey,
   sortChatMessages,
 } from './queries';
+import AttachmentList from './attachment-list';
+import {
+  CHAT_ATTACHMENT_MAX_FILES,
+  CHAT_ATTACHMENT_MAX_FILE_SIZE,
+  ChatAttachment,
+  formatAttachmentSize,
+  parseChatAttachments,
+  removeAttachmentMarkersFromHtml,
+  serializeChatAttachment,
+  uploadChatAttachment,
+} from './attachments';
 
 const intlMessages = defineMessages({
   title: {
@@ -41,6 +52,30 @@ const intlMessages = defineMessages({
     id: 'plugin.chat.panel.send',
     defaultMessage: 'Send',
   },
+  attachmentAdd: {
+    id: 'plugin.chat.attachment.add',
+    defaultMessage: 'Attach files',
+  },
+  attachmentRemove: {
+    id: 'plugin.chat.attachment.remove',
+    defaultMessage: 'Remove {name}',
+  },
+  attachmentUploading: {
+    id: 'plugin.chat.attachment.uploading',
+    defaultMessage: 'Uploading…',
+  },
+  attachmentTooLarge: {
+    id: 'plugin.chat.attachment.tooLarge',
+    defaultMessage: 'The file is too large. Maximum size: {size}',
+  },
+  attachmentTooMany: {
+    id: 'plugin.chat.attachment.tooMany',
+    defaultMessage: 'You can attach up to {count} files',
+  },
+  attachmentUploadFailed: {
+    id: 'plugin.chat.attachment.uploadFailed',
+    defaultMessage: 'Could not upload the file',
+  },
 });
 
 interface ChatPanelProps {
@@ -57,10 +92,17 @@ function ChatPanel({
   intl, pluginApi, onClose, actionsHeight, streamMessages, isOpen,
 }: ChatPanelProps): React.ReactNode {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const lastSeenRequestRef = React.useRef('');
   const [draftMessage, setDraftMessage] = React.useState('');
+  const [attachments, setAttachments] = React.useState<ChatAttachment[]>([]);
+  const [attachmentUploading, setAttachmentUploading] = React.useState(false);
+  const [attachmentError, setAttachmentError] = React.useState('');
   const [setChatLastSeen] = pluginApi
     .useCustomMutation!<ChatSetLastSeenVariables>(CHAT_SET_LAST_SEEN);
+  const { data: meeting } = pluginApi.useMeetingData!();
+  const meetingId = meeting?.meetingId ?? '';
+  const sessionToken = pluginApi.getSessionToken?.() ?? '';
 
   const { data } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
     CHAT_ALL_MESSAGES_SUBSCRIPTION,
@@ -107,15 +149,60 @@ function ChatPanel({
 
   const canSendMessage = Boolean(pluginApi.serverCommands?.chat?.sendPublicChatMessage);
   const trimmedDraftMessage = draftMessage.trim();
+  const canSubmit = canSendMessage
+    && !attachmentUploading
+    && Boolean(trimmedDraftMessage || attachments.length > 0);
+
+  const handleFilesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (selectedFiles.length === 0) return;
+
+    if (attachments.length + selectedFiles.length > CHAT_ATTACHMENT_MAX_FILES) {
+      setAttachmentError(intl.formatMessage(intlMessages.attachmentTooMany, {
+        count: CHAT_ATTACHMENT_MAX_FILES,
+      }));
+      return;
+    }
+
+    if (selectedFiles.some((file) => file.size > CHAT_ATTACHMENT_MAX_FILE_SIZE)) {
+      setAttachmentError(intl.formatMessage(intlMessages.attachmentTooLarge, {
+        size: formatAttachmentSize(CHAT_ATTACHMENT_MAX_FILE_SIZE, intl.locale),
+      }));
+      return;
+    }
+
+    setAttachmentUploading(true);
+    setAttachmentError('');
+    try {
+      const results = await Promise.allSettled(
+        selectedFiles.map((file) => uploadChatAttachment(file, sessionToken)),
+      );
+      const uploaded = results.flatMap((result) => (
+        result.status === 'fulfilled' ? [result.value] : []
+      ));
+      if (uploaded.length > 0) setAttachments((current) => [...current, ...uploaded]);
+      if (results.some((result) => result.status === 'rejected')) {
+        setAttachmentError(intl.formatMessage(intlMessages.attachmentUploadFailed));
+      }
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
 
   const handleSendMessage = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!trimmedDraftMessage || !canSendMessage) return;
+    if (!canSubmit) return;
+
+    const attachmentMarkers = attachments.map(serializeChatAttachment);
+    const outgoingMessage = [trimmedDraftMessage, ...attachmentMarkers].filter(Boolean).join('\n');
 
     pluginApi.serverCommands?.chat.sendPublicChatMessage({
-      textMessageInMarkdownFormat: trimmedDraftMessage,
+      textMessageInMarkdownFormat: outgoingMessage,
     });
     setDraftMessage('');
+    setAttachments([]);
+    setAttachmentError('');
   };
 
   const getRoleColor = (role: string | null): string => {
@@ -232,6 +319,11 @@ function ChatPanel({
           }
 
           const senderName = msg.senderName || intl.formatMessage(intlMessages.unknownUser);
+          const parsedAttachments = parseChatAttachments(msg.message);
+          const visibleMessage = removeAttachmentMarkersFromHtml(
+            msg.messageAsHtml,
+            parsedAttachments.markerLines,
+          );
 
           return (
             <div key={getChatMessageKey(msg)} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
@@ -284,16 +376,26 @@ function ChatPanel({
                   )}
                 </div>
                 {/* eslint-disable react/no-danger */}
-                <div
-                  style={{
-                    fontSize: '12px',
-                    color: 'rgba(255,255,255,0.85)',
-                    wordBreak: 'break-word',
-                    lineHeight: '1.4',
-                  }}
-                  dangerouslySetInnerHTML={{ __html: msg.messageAsHtml || msg.message }}
-                />
+                {visibleMessage ? (
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: 'rgba(255,255,255,0.85)',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.4',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: visibleMessage }}
+                  />
+                ) : null}
                 {/* eslint-enable react/no-danger */}
+                {parsedAttachments.attachments.length > 0 ? (
+                  <AttachmentList
+                    attachments={parsedAttachments.attachments}
+                    intl={intl}
+                    meetingId={meetingId}
+                    sessionToken={sessionToken}
+                  />
+                ) : null}
               </div>
             </div>
           );
@@ -306,6 +408,7 @@ function ChatPanel({
         onSubmit={handleSendMessage}
         style={{
           display: 'flex',
+          flexDirection: 'column',
           gap: '6px',
           padding: '6px 8px',
           borderTop: '1px solid rgba(255,255,255,0.1)',
@@ -313,43 +416,128 @@ function ChatPanel({
         }}
       >
         <input
-          type="text"
-          value={draftMessage}
-          onChange={(event) => setDraftMessage(event.target.value)}
-          placeholder={intl.formatMessage(intlMessages.inputPlaceholder)}
-          aria-label={intl.formatMessage(intlMessages.inputLabel)}
-          disabled={!canSendMessage}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            height: '30px',
-            border: '1px solid rgba(255,255,255,0.16)',
-            borderRadius: '4px',
-            backgroundColor: 'rgba(255,255,255,0.08)',
-            color: '#fff',
-            fontSize: '12px',
-            padding: '0 8px',
-            outline: 'none',
-          }}
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={handleFilesSelected}
+          tabIndex={-1}
+          style={{ display: 'none' }}
         />
-        <button
-          type="submit"
-          disabled={!trimmedDraftMessage || !canSendMessage}
-          style={{
-            height: '30px',
-            minWidth: '54px',
-            border: 'none',
-            borderRadius: '4px',
-            backgroundColor: trimmedDraftMessage && canSendMessage ? '#3b82f6' : 'rgba(255,255,255,0.12)',
-            color: '#fff',
-            cursor: trimmedDraftMessage && canSendMessage ? 'pointer' : 'default',
-            fontSize: '12px',
-            fontWeight: 600,
-            padding: '0 10px',
-          }}
-        >
-          {intl.formatMessage(intlMessages.send)}
-        </button>
+        {attachments.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+            {attachments.map((attachment) => (
+              <span
+                key={attachment.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  maxWidth: '100%',
+                  padding: '3px 5px',
+                  borderRadius: '4px',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  fontSize: '10px',
+                }}
+              >
+                <span aria-hidden="true">📎</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {attachment.name}
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
+                  {formatAttachmentSize(attachment.size, intl.locale)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAttachments((current) => (
+                    current.filter(({ id }) => id !== attachment.id)
+                  ))}
+                  aria-label={intl.formatMessage(
+                    intlMessages.attachmentRemove,
+                    { name: attachment.name },
+                  )}
+                  title={intl.formatMessage(
+                    intlMessages.attachmentRemove,
+                    { name: attachment.name },
+                  )}
+                  style={{
+                    border: 0, background: 'none', color: '#fff', padding: 0, cursor: 'pointer',
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {attachmentError ? (
+          <span role="alert" style={{ color: '#fca5a5', fontSize: '10px' }}>{attachmentError}</span>
+        ) : null}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input
+            type="text"
+            value={draftMessage}
+            onChange={(event) => setDraftMessage(event.target.value)}
+            placeholder={intl.formatMessage(intlMessages.inputPlaceholder)}
+            aria-label={intl.formatMessage(intlMessages.inputLabel)}
+            disabled={!canSendMessage || attachmentUploading}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: '30px',
+              border: '1px solid rgba(255,255,255,0.16)',
+              borderRadius: '4px',
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              color: '#fff',
+              fontSize: '12px',
+              padding: '0 8px',
+              outline: 'none',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!canSendMessage
+              || attachmentUploading
+              || attachments.length >= CHAT_ATTACHMENT_MAX_FILES}
+            aria-label={intl.formatMessage(intlMessages.attachmentAdd)}
+            title={intl.formatMessage(intlMessages.attachmentAdd)}
+            style={{
+              height: '30px',
+              width: '34px',
+              border: '1px solid rgba(255,255,255,0.16)',
+              borderRadius: '4px',
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              color: '#fff',
+              cursor: attachmentUploading ? 'default' : 'pointer',
+            }}
+          >
+            {attachmentUploading ? '…' : '📎'}
+            <span className="sr-only">
+              {attachmentUploading
+                ? intl.formatMessage(intlMessages.attachmentUploading)
+                : intl.formatMessage(intlMessages.attachmentAdd)}
+            </span>
+          </button>
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            style={{
+              height: '30px',
+              minWidth: '54px',
+              border: 'none',
+              borderRadius: '4px',
+              backgroundColor: canSubmit ? '#3b82f6' : 'rgba(255,255,255,0.12)',
+              color: '#fff',
+              cursor: canSubmit ? 'pointer' : 'default',
+              fontSize: '12px',
+              fontWeight: 600,
+              padding: '0 10px',
+            }}
+          >
+            {intl.formatMessage(intlMessages.send)}
+          </button>
+        </div>
       </form>
     </div>
   );
