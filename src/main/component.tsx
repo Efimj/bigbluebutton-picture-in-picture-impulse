@@ -278,6 +278,18 @@ function MainComponent({ pluginUuid }: MainComponentProps): React.ReactNode {
           fonts.href = 'stylesheets/bbb-icons.css';
           pipWindow.document.head.appendChild(fonts);
 
+          // Document PiP starts with an empty document. Copy the resolved main
+          // page favicon URL so the PiP window uses the same conference icon.
+          const mainFavicon = document.querySelector<HTMLLinkElement>(
+            'link[rel~="icon"], link[rel="shortcut icon"]',
+          );
+          const favicon = pipWindow.document.createElement('link');
+          favicon.rel = 'icon';
+          favicon.href = mainFavicon?.href || new URL('/favicon.ico', window.location.origin).href;
+          if (mainFavicon?.type) favicon.type = mainFavicon.type;
+          pipWindow.document.head.appendChild(favicon);
+          pipWindow.document.title = document.title;
+
           pipRoot.render(
             <Pip
               pluginApi={pluginApi}

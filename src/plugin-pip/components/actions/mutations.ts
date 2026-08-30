@@ -7,19 +7,7 @@ export const USER_SET_MUTED = `
   }
 `;
 
-export const CAMERA_BROADCAST_STOP = `
-  mutation CameraBroadcastStop($cameraId: String!) {
-    cameraBroadcastStop(
-      stream: $cameraId
-    )
-  }
-`;
-
 export interface UserSetMutedMutationVariables {
   userId: string;
   muted: boolean;
-}
-
-export interface CameraBroadcastStopMutationVariables {
-  cameraId: string;
 }

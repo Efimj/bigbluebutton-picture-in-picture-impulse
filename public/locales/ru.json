@@ -59,7 +59,7 @@
   "plugin.unreadChat.tooltip.none": "Нет непрочитанных сообщений",
   "plugin.unreadChat.tooltip.count": "{count} непрочитанных сообщений",
   "plugin.webcam.tooltip.sharing": "Остановить трансляцию камер",
-  "plugin.webcam.tooltip.notSharing": "Вы не транслируете камеру",
+  "plugin.webcam.tooltip.notSharing": "Включить камеру",
   "plugin.webcam.srOnly": "Остановить камеры",
   "plugin.audio.tooltip.noAudio": "Нет звука",
   "plugin.audio.tooltip.unmute": "Включить микрофон",

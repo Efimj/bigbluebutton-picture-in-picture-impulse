@@ -30,7 +30,10 @@ function UnreadChatButtonComponent(
   const {
     data: publicChat,
   } = pluginApi.useCustomSubscription!<PublicChatSubscriptionResult>(PUBLIC_CHAT);
-  const unreadCount = publicChat?.chat[0]?.totalUnread ?? 0;
+  // The last-seen mutation is asynchronous, so hide stale server data while
+  // the chat is visibly open. The subscription supplies the persisted value
+  // again as soon as BBB has processed it.
+  const unreadCount = chatOpen ? 0 : (publicChat?.chat[0]?.totalUnread ?? 0);
 
   const tooltipMessage = unreadCount > 0
     ? intl.formatMessage(intlMessages.unreadChatTooltipCount, { count: unreadCount })

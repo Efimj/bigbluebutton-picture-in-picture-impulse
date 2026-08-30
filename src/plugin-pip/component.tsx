@@ -44,15 +44,14 @@ function PluginPipInner({
         usersOpen={openPanel === 'users'}
         onUsersToggle={() => setOpenPanel((panel) => (panel === 'users' ? null : 'users'))}
       />
-      {openPanel === 'chat' && (
-        <ChatPanel
-          intl={intl}
-          pluginApi={pluginApi}
-          onClose={() => setOpenPanel(null)}
-          actionsHeight={actions.height}
-          streamMessages={streamMessages}
-        />
-      )}
+      <ChatPanel
+        intl={intl}
+        pluginApi={pluginApi}
+        onClose={() => setOpenPanel(null)}
+        actionsHeight={actions.height}
+        streamMessages={streamMessages}
+        isOpen={openPanel === 'chat'}
+      />
       {openPanel === 'users' && (
         <UsersPanel
           intl={intl}

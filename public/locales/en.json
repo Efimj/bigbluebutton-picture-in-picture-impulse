@@ -59,7 +59,7 @@
   "plugin.unreadChat.tooltip.none": "No unread messages",
   "plugin.unreadChat.tooltip.count": "{count} unread messages",
   "plugin.webcam.tooltip.sharing": "Stop sharing webcams",
-  "plugin.webcam.tooltip.notSharing": "You're not sharing webcam",
+  "plugin.webcam.tooltip.notSharing": "Share webcam",
   "plugin.webcam.srOnly": "Stop webcams",
   "plugin.audio.tooltip.noAudio": "No audio",
   "plugin.audio.tooltip.unmute": "Unmute",

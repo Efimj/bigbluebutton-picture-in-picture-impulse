@@ -4,8 +4,10 @@ import { defineMessages, IntlShape } from 'react-intl';
 import {
   CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION,
   CHAT_ALL_MESSAGES_SUBSCRIPTION,
+  CHAT_SET_LAST_SEEN,
   ChatAllMessagesResponse,
   ChatMessage,
+  ChatSetLastSeenVariables,
   getChatMessageKey,
   sortChatMessages,
 } from './queries';
@@ -48,13 +50,17 @@ interface ChatPanelProps {
   /** Bottom offset in px to leave the actions bar visible */
   actionsHeight: number;
   streamMessages: ChatMessage[];
+  isOpen: boolean;
 }
 
 function ChatPanel({
-  intl, pluginApi, onClose, actionsHeight, streamMessages,
+  intl, pluginApi, onClose, actionsHeight, streamMessages, isOpen,
 }: ChatPanelProps): React.ReactNode {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const lastSeenRequestRef = React.useRef('');
   const [draftMessage, setDraftMessage] = React.useState('');
+  const [setChatLastSeen] = pluginApi
+    .useCustomMutation!<ChatSetLastSeenVariables>(CHAT_SET_LAST_SEEN);
 
   const { data } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
     CHAT_ALL_MESSAGES_SUBSCRIPTION,
@@ -79,8 +85,25 @@ function ChatPanel({
   }, [publicMessages, fallbackMessages, streamMessages]);
 
   React.useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [isOpen, messages.length]);
+
+  const lastMessage = messages[messages.length - 1];
+  const lastSeenRequestKey = lastMessage?.chatId && lastMessage?.createdAt
+    ? `${lastMessage.chatId}|${lastMessage.createdAt}`
+    : '';
+
+  React.useEffect(() => {
+    if (!isOpen || !lastSeenRequestKey || lastSeenRequestRef.current === lastSeenRequestKey) return;
+
+    lastSeenRequestRef.current = lastSeenRequestKey;
+    setChatLastSeen({
+      variables: {
+        chatId: lastMessage.chatId,
+        lastSeenAt: lastMessage.createdAt,
+      },
+    });
+  }, [isOpen, lastMessage?.chatId, lastMessage?.createdAt, lastSeenRequestKey, setChatLastSeen]);
 
   const canSendMessage = Boolean(pluginApi.serverCommands?.chat?.sendPublicChatMessage);
   const trimmedDraftMessage = draftMessage.trim();
@@ -124,10 +147,11 @@ function ChatPanel({
         bottom: actionsHeight,
         backgroundColor: 'rgba(20, 20, 20, 0.97)',
         zIndex: 200,
-        display: 'flex',
+        display: isOpen ? 'flex' : 'none',
         flexDirection: 'column',
         backdropFilter: 'blur(4px)',
       }}
+      aria-hidden={!isOpen}
     >
       {/* Header */}
       <div

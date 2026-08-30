@@ -92,3 +92,17 @@ export const CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION = `
 export interface ChatAllMessagesResponse {
   chat_message: Array<Omit<Message, 'messageMetadata'>>;
 }
+
+export const CHAT_SET_LAST_SEEN = `
+  mutation UpdateChatLastSeen($chatId: String, $lastSeenAt: String) {
+    chatSetLastSeen(
+      chatId: $chatId
+      lastSeenAt: $lastSeenAt
+    )
+  }
+`;
+
+export interface ChatSetLastSeenVariables {
+  chatId: string;
+  lastSeenAt: string;
+}
