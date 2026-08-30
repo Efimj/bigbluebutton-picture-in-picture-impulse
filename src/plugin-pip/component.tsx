@@ -15,7 +15,6 @@ import {
   ChatMessage,
   ChatsSubscriptionResponse,
 } from './components/chat/queries';
-import { useVideoStreams } from './components/cameras/hooks';
 import { useScreenshare } from './components/screenshare/hooks';
 import { PipWindowProvider } from './components/contexts/pip-window';
 import { LayoutProvider, useLayoutContext } from './components/contexts/layout';
@@ -125,14 +124,14 @@ function PluginPipInner({
 
 function PluginPip({ intl, pluginApi, pipWindow }: PluginPipProps): React.ReactNode {
   const { data: currentUser } = pluginApi.useCurrentUser();
-  const { data: webcams } = useVideoStreams(pluginApi);
   const { data: screenshare } = useScreenshare(pluginApi);
   const { latestStreamMessages, streamMessages } = useChatMessageStream(pluginApi);
 
   // Force strict booleans so layout can render even when hook payload is partial.
   const presenter = Boolean(currentUser?.presenter);
   const moderator = currentUser?.role === 'MODERATOR';
-  const hasWebcams = Boolean(webcams?.user_camera?.length);
+  // The participant grid is PiP's default view, even before anyone enables a camera.
+  const hasWebcams = true;
   const hasScreenshare = Boolean(screenshare?.screenshare?.length);
 
   const containerClassName = ['container'];

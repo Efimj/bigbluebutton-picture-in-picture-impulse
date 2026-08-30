@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect } from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
-import { useVideoStreams } from './hooks';
+import { useParticipants, useVideoStreams } from './hooks';
 import VideoItem from './video-item';
 import Skeleton from '../ui/skeleton';
 import { range } from './utils';
@@ -10,28 +10,16 @@ import { usePipWindow } from '../contexts/pip-window';
 
 const createVideoSelector = (streamId: string) => `.video-provider_list .videoContainer[data-stream="${streamId}"] video`;
 
-const pollForVideoSrc = (
+const getVideoSrc = (
   streamId: string,
-  container: Element = document.body,
-): Promise<MediaStream | null> => new Promise((resolve) => {
-  const TIMEOUT = 5000; // 5 seconds
-  const start = performance.now();
+  container?: Element | null,
+): MediaStream | null => {
   const selector = createVideoSelector(streamId);
-
-  const poll = () => {
-    const timestamp: number = performance.now();
-    const element = container.querySelector(selector);
-    if (element && element instanceof HTMLVideoElement && element.srcObject) {
-      return resolve(element.srcObject as MediaStream);
-    }
-    if (timestamp - start > TIMEOUT) {
-      return resolve(null);
-    }
-    return setTimeout(poll);
-  };
-
-  setTimeout(poll);
-});
+  const element = (container || document.body).querySelector(selector);
+  return element instanceof HTMLVideoElement && element.srcObject
+    ? element.srcObject as MediaStream
+    : null;
+};
 
 const ASPECT_RATIO = 4 / 3;
 
@@ -112,11 +100,13 @@ const extractVideoStreamIds = (container: Element | null): string[] => {
 const VIDEO_LIST_CLASSNAME = 'video-provider_list';
 
 interface Media {
-  srcObject: MediaStream;
+  srcObject: MediaStream | null;
   streamId: string;
   userName: string;
   userId: string;
   userTalking: boolean;
+  avatar?: string;
+  color?: string;
 }
 
 interface CamerasComponentProps {
@@ -125,7 +115,6 @@ interface CamerasComponentProps {
 
 function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode {
   const [videos, setVideos] = React.useState<Media[]>([]);
-  const [loading, setLoading] = React.useState(true);
   const [lastUpdate, setLastUpdate] = React.useState(Date.now());
   const { cameras: camerasRect } = useLayoutContext();
   const pipWindow = usePipWindow();
@@ -134,26 +123,38 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
 
   const {
     data: videoStreamsData,
+    error: videoStreamsError,
   } = useVideoStreams(pluginApi);
+  const {
+    data: participantsData,
+    loading: participantsLoading,
+    error: participantsError,
+  } = useParticipants(pluginApi);
+  // Participant placeholders are the default view and must not wait for the
+  // independent camera-stream subscription to finish connecting.
+  const loading = participantsLoading;
 
   useEffect(() => {
-    async function update() {
+    if (loading) return undefined;
+
+    function update() {
       const videoList = document.getElementsByClassName(VIDEO_LIST_CLASSNAME)[0];
       const videoStreamIds = extractVideoStreamIds(videoList);
       const videoIndexes = Object.fromEntries(Object.entries(videoStreamIds)
         .map(([index, streamId]) => ([streamId, Number.parseInt(index, 10)])));
       const streams = videoStreamsData?.user_camera || [];
+      const participants = (participantsData?.user || []).filter((user) => !user.bot);
 
       const videoSrc = streams.map(
-        async (stream) => {
-          const srcObject = await pollForVideoSrc(stream.streamId, videoList);
+        (stream) => {
+          const srcObject = getVideoSrc(stream.streamId, videoList);
 
           if (srcObject) {
             return {
               streamId: stream.streamId,
-              userName: stream.user?.name,
-              userId: stream.user?.userId,
-              userTalking: stream.voice?.talking,
+              userName: stream.user?.name ?? '',
+              userId: stream.user?.userId ?? '',
+              userTalking: stream.voice?.talking ?? false,
               srcObject,
             };
           }
@@ -162,22 +163,55 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
         },
       );
 
-      const videoResolved = await Promise.all(videoSrc);
-      const actualVideos = videoResolved.filter((v) => v).sort((a, b) => {
+      const actualVideos = videoSrc.filter((v): v is Media => Boolean(v)).sort((a, b) => {
         const indexA = videoIndexes[a.streamId] ?? 0;
         const indexB = videoIndexes[b.streamId] ?? 0;
         return indexA - indexB;
       });
-      return actualVideos;
+      const usersWithResolvedVideo = new Set(actualVideos.map((video) => video.userId));
+      const participantPlaceholders: Media[] = participants
+        .filter((participant) => !usersWithResolvedVideo.has(participant.userId))
+        .map((participant) => ({
+          srcObject: null,
+          streamId: `participant-${participant.userId}`,
+          userName: participant.name,
+          userId: participant.userId,
+          userTalking: false,
+          avatar: participant.avatar,
+          color: participant.color,
+        }));
+
+      return {
+        tiles: [...actualVideos, ...participantPlaceholders],
+        unresolvedStreamCount: Math.max(streams.length - actualVideos.length, 0),
+      };
     }
 
-    setLoading(true);
-    update()
-      .then(setVideos)
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [videoStreamsData, lastUpdate]);
+    const { tiles, unresolvedStreamCount } = update();
+    setVideos(tiles);
+
+    // Setting HTMLVideoElement.srcObject does not mutate DOM attributes, so a
+    // MutationObserver cannot see that transition. Retry only while at least
+    // one subscribed stream has not acquired its MediaStream yet.
+    const retryTimer = unresolvedStreamCount > 0
+      ? window.setTimeout(() => setLastUpdate(Date.now()), 1000)
+      : undefined;
+
+    return () => {
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [videoStreamsData, participantsData, loading, lastUpdate]);
+
+  useEffect(() => {
+    if (!videoStreamsError && !participantsError) return;
+    // Keep PiP usable if one subscription fails: the other source can still
+    // provide camera videos or participant placeholders.
+    // eslint-disable-next-line no-console
+    console.warn('[PiP Plugin] Participant grid subscription failed', {
+      videoStreamsError,
+      participantsError,
+    });
+  }, [videoStreamsError, participantsError]);
 
   useEffect(() => {
     const targetNode = document.getElementsByClassName(VIDEO_LIST_CLASSNAME)[0];
@@ -201,7 +235,7 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
   const paddingBlock = camerasRef.current ? parseInt(pipWindow.getComputedStyle(camerasRef.current)
     .getPropertyValue('padding-block'), 10) : 8;
 
-  const gridGutter = webcamsRef.current ? parseInt(window.getComputedStyle(webcamsRef.current)
+  const gridGutter = webcamsRef.current ? parseInt(pipWindow.getComputedStyle(webcamsRef.current)
     .getPropertyValue('grid-row-gap'), 10) : 6;
 
   const optimalGrid = React.useMemo(() => findOptimalGrid(
@@ -246,6 +280,8 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
             srcObject={video.srcObject}
             userTalking={video.userTalking}
             userName={video.userName}
+            avatar={video.avatar}
+            color={video.color}
           />
         ))}
       </div>

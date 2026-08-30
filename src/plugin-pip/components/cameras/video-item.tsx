@@ -3,13 +3,15 @@ import Video from './video';
 
 interface VideoItemProps {
   streamId: string;
-  srcObject: MediaStream;
+  srcObject?: MediaStream | null;
   userTalking: boolean;
   userName: string;
+  avatar?: string;
+  color?: string;
 }
 
 function VideoItem({
-  streamId, srcObject, userTalking, userName,
+  streamId, srcObject, userTalking, userName, avatar, color,
 }: VideoItemProps) {
   const [squeezed, setSqueezed] = React.useState(false);
   const observerRef = React.useRef<ResizeObserver | null>(null);
@@ -27,9 +29,23 @@ function VideoItem({
     }
   }, []);
 
+  const initials = userName.trim().slice(0, 2) || '?';
+
   return (
-    <div key={streamId} ref={updateRef} className="pip-video-container">
-      <Video srcObject={srcObject} talking={userTalking} />
+    <div
+      key={streamId}
+      ref={updateRef}
+      className={`pip-video-container${userTalking ? ' talking' : ''}`}
+    >
+      {srcObject ? <Video srcObject={srcObject} talking={userTalking} /> : (
+        <div
+          className="pip-participant-avatar"
+          style={{ backgroundColor: color || '#4b5563' }}
+          aria-label={userName}
+        >
+          {avatar ? <img src={avatar} alt="" /> : initials}
+        </div>
+      )}
       {!squeezed && (
         <span className="username">
           {userName}

@@ -182,6 +182,28 @@ const cssRules = css`
     overflow: hidden;
   }
 
+  .pip-video-container.talking {
+    box-shadow: inset 0 0 0 2px #3b82f6;
+  }
+
+  .pip-participant-avatar {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: clamp(0.75rem, 4vw, 2rem);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .pip-participant-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
   .cameras {
     padding: 0.5rem;
   }
