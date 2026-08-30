@@ -13,13 +13,14 @@ interface ActionsComponentProps {
   intl: IntlShape;
   pluginApi: PluginApi;
   chatOpen: boolean;
+  activeChatId: string;
   onChatToggle: () => void;
   usersOpen: boolean;
   onUsersToggle: () => void;
 }
 
 function ActionsComponent({
-  intl, pluginApi, chatOpen, onChatToggle, usersOpen, onUsersToggle,
+  intl, pluginApi, chatOpen, activeChatId, onChatToggle, usersOpen, onUsersToggle,
 }: ActionsComponentProps): React.ReactNode {
   const { actions } = useLayoutContext();
   return (
@@ -40,6 +41,7 @@ function ActionsComponent({
           intl={intl}
           pluginApi={pluginApi}
           chatOpen={chatOpen}
+          activeChatId={activeChatId}
           onChatToggle={onChatToggle}
         />
         <RaisedHandsButtonComponent intl={intl} pluginApi={pluginApi} />

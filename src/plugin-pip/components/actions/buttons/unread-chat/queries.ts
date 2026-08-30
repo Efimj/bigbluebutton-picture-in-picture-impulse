@@ -1,13 +1,15 @@
-export const PUBLIC_CHAT = `
-  subscription PublicChat {
-    chat(where: {public: {_eq: true}}) {
+export const CHATS_UNREAD = `
+  subscription PipChatsUnread {
+    chat {
+      chatId
       totalUnread
     }
   }
 `;
 
-export interface PublicChatSubscriptionResult {
+export interface ChatsUnreadSubscriptionResult {
   chat: {
+    chatId: string;
     totalUnread: number;
   }[];
 }

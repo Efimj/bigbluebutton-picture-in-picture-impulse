@@ -10,7 +10,11 @@ import UsersPanel from './components/actions/buttons/users/panel';
 import RaisedHandNotifier from './components/raised-hands/component';
 import { ToastProvider } from './components/ui/toast';
 import { useChatMessageStream } from './components/chat/hooks';
-import { ChatMessage } from './components/chat/queries';
+import {
+  CHATS_SUBSCRIPTION,
+  ChatMessage,
+  ChatsSubscriptionResponse,
+} from './components/chat/queries';
 import { useVideoStreams } from './components/cameras/hooks';
 import { useScreenshare } from './components/screenshare/hooks';
 import { PipWindowProvider } from './components/contexts/pip-window';
@@ -32,7 +36,56 @@ function PluginPipInner({
   intl, pluginApi, streamMessages,
 }: PluginPipInnerProps): React.ReactNode {
   const [openPanel, setOpenPanel] = React.useState<'chat' | 'users' | null>(null);
+  const [selectedChatId, setSelectedChatId] = React.useState<string | null>(null);
+  const [pendingPrivateChat, setPendingPrivateChat] = React.useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
   const { actions } = useLayoutContext();
+  const { data: chatsData } = pluginApi
+    .useCustomSubscription!<ChatsSubscriptionResponse>(CHATS_SUBSCRIPTION);
+  const chats = chatsData?.chat ?? [];
+  const publicChat = chats.find((chat) => chat.public);
+  const pendingResolvedChat = pendingPrivateChat
+    ? chats.find((chat) => !chat.public
+      && chat.participant?.userId === pendingPrivateChat.userId)
+    : undefined;
+  const selectedChat = pendingPrivateChat
+    ? pendingResolvedChat
+    : (chats.find((chat) => chat.chatId === selectedChatId) || publicChat);
+
+  React.useEffect(() => {
+    if (!pendingResolvedChat) return;
+    setSelectedChatId(pendingResolvedChat.chatId);
+    setPendingPrivateChat(null);
+  }, [pendingResolvedChat]);
+
+  const openPrivateChat = (userId: string, userName: string) => {
+    const existingChat = chats.find((chat) => (
+      !chat.public && chat.participant?.userId === userId
+    ));
+
+    if (existingChat) {
+      setSelectedChatId(existingChat.chatId);
+      setPendingPrivateChat(null);
+    } else {
+      setSelectedChatId(null);
+      setPendingPrivateChat({ userId, userName });
+      pluginApi.serverCommands?.chat?.createPrivateChat({ userId });
+    }
+    setOpenPanel('chat');
+  };
+
+  const showPublicChat = () => {
+    setPendingPrivateChat(null);
+    setSelectedChatId(publicChat?.chatId ?? null);
+  };
+
+  const activeChatId = selectedChat?.chatId ?? '';
+  const activeChatIsPublic = pendingPrivateChat ? false : (selectedChat?.public ?? true);
+  const activeChatTitle = pendingPrivateChat?.userName
+    || selectedChat?.participant?.name
+    || '';
 
   return (
     <>
@@ -40,6 +93,7 @@ function PluginPipInner({
         pluginApi={pluginApi}
         intl={intl}
         chatOpen={openPanel === 'chat'}
+        activeChatId={activeChatId}
         onChatToggle={() => setOpenPanel((panel) => (panel === 'chat' ? null : 'chat'))}
         usersOpen={openPanel === 'users'}
         onUsersToggle={() => setOpenPanel((panel) => (panel === 'users' ? null : 'users'))}
@@ -51,6 +105,10 @@ function PluginPipInner({
         actionsHeight={actions.height}
         streamMessages={streamMessages}
         isOpen={openPanel === 'chat'}
+        chatId={activeChatId}
+        chatTitle={activeChatTitle}
+        isPublic={activeChatIsPublic}
+        onShowPublicChat={showPublicChat}
       />
       {openPanel === 'users' && (
         <UsersPanel
@@ -58,6 +116,7 @@ function PluginPipInner({
           pluginApi={pluginApi}
           onClose={() => setOpenPanel(null)}
           actionsHeight={actions.height}
+          onPrivateChat={openPrivateChat}
         />
       )}
     </>

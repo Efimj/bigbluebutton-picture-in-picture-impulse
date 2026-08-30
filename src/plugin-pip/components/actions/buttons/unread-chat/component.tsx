@@ -2,7 +2,7 @@ import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { defineMessages, IntlShape } from 'react-intl';
 import Tooltip from '../../../ui/tooltip';
-import { PUBLIC_CHAT, PublicChatSubscriptionResult } from './queries';
+import { CHATS_UNREAD, ChatsUnreadSubscriptionResult } from './queries';
 
 const intlMessages = defineMessages({
   unreadChatTooltipNone: {
@@ -19,21 +19,23 @@ interface UnreadChatButtonComponentProps {
   intl: IntlShape;
   pluginApi: PluginApi;
   chatOpen: boolean;
+  activeChatId: string;
   onChatToggle: () => void;
 }
 
 function UnreadChatButtonComponent(
   {
-    intl, pluginApi, chatOpen, onChatToggle,
+    intl, pluginApi, chatOpen, activeChatId, onChatToggle,
   }: UnreadChatButtonComponentProps,
 ): React.ReactNode {
   const {
-    data: publicChat,
-  } = pluginApi.useCustomSubscription!<PublicChatSubscriptionResult>(PUBLIC_CHAT);
-  // The last-seen mutation is asynchronous, so hide stale server data while
-  // the chat is visibly open. The subscription supplies the persisted value
-  // again as soon as BBB has processed it.
-  const unreadCount = chatOpen ? 0 : (publicChat?.chat[0]?.totalUnread ?? 0);
+    data: chatsData,
+  } = pluginApi.useCustomSubscription!<ChatsUnreadSubscriptionResult>(CHATS_UNREAD);
+  // Hide the active chat's stale count while its last-seen mutation is being
+  // processed, but keep unread badges from other public/private conversations.
+  const unreadCount = (chatsData?.chat ?? []).reduce((total, chat) => (
+    total + (chatOpen && chat.chatId === activeChatId ? 0 : (chat.totalUnread ?? 0))
+  ), 0);
 
   const tooltipMessage = unreadCount > 0
     ? intl.formatMessage(intlMessages.unreadChatTooltipCount, { count: unreadCount })

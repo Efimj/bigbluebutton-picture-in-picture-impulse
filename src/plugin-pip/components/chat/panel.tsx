@@ -2,8 +2,8 @@ import * as React from 'react';
 import { PluginApi } from 'bigbluebutton-html-plugin-sdk';
 import { defineMessages, IntlShape } from 'react-intl';
 import {
-  CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION,
-  CHAT_ALL_MESSAGES_SUBSCRIPTION,
+  CHAT_PRIVATE_HISTORY_SUBSCRIPTION,
+  CHAT_PUBLIC_HISTORY_SUBSCRIPTION,
   CHAT_SET_LAST_SEEN,
   ChatAllMessagesResponse,
   ChatMessage,
@@ -76,6 +76,14 @@ const intlMessages = defineMessages({
     id: 'plugin.chat.attachment.uploadFailed',
     defaultMessage: 'Could not upload the file',
   },
+  backToPublic: {
+    id: 'plugin.chat.panel.backToPublic',
+    defaultMessage: 'Back to public chat',
+  },
+  openingPrivate: {
+    id: 'plugin.chat.panel.openingPrivate',
+    defaultMessage: 'Opening private conversation…',
+  },
 });
 
 interface ChatPanelProps {
@@ -86,10 +94,23 @@ interface ChatPanelProps {
   actionsHeight: number;
   streamMessages: ChatMessage[];
   isOpen: boolean;
+  chatId: string;
+  chatTitle: string;
+  isPublic: boolean;
+  onShowPublicChat: () => void;
 }
 
 function ChatPanel({
-  intl, pluginApi, onClose, actionsHeight, streamMessages, isOpen,
+  intl,
+  pluginApi,
+  onClose,
+  actionsHeight,
+  streamMessages,
+  isOpen,
+  chatId,
+  chatTitle,
+  isPublic,
+  onShowPublicChat,
 }: ChatPanelProps): React.ReactNode {
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -104,19 +125,26 @@ function ChatPanel({
   const meetingId = meeting?.meetingId ?? '';
   const sessionToken = pluginApi.getSessionToken?.() ?? '';
 
-  const { data } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
-    CHAT_ALL_MESSAGES_SUBSCRIPTION,
-  );
-  const { data: fallbackData } = pluginApi.useCustomSubscription!<ChatAllMessagesResponse>(
-    CHAT_ALL_MESSAGES_FALLBACK_SUBSCRIPTION,
-  );
+  const { data: publicHistoryData } = pluginApi
+    .useCustomSubscription!<ChatAllMessagesResponse>(
+      CHAT_PUBLIC_HISTORY_SUBSCRIPTION,
+    );
+  const { data: privateHistoryData } = pluginApi
+    .useCustomSubscription!<ChatAllMessagesResponse>(
+      CHAT_PRIVATE_HISTORY_SUBSCRIPTION,
+      { variables: { chatId: isPublic ? '' : chatId } },
+    );
 
-  const publicMessages = data?.chat_message ?? [];
-  const fallbackMessages = fallbackData?.chat_message ?? [];
+  const historyMessages = isPublic
+    ? (publicHistoryData?.chat_message_public ?? [])
+    : (privateHistoryData?.chat_message_private ?? []);
 
   const messages = React.useMemo<ChatMessage[]>(() => {
-    const baseMessages = publicMessages.length > 0 ? publicMessages : fallbackMessages;
-    const merged = [...baseMessages, ...streamMessages];
+    if (!chatId) return [];
+
+    const baseMessages = historyMessages.filter((message) => message.chatId === chatId);
+    const selectedStreamMessages = streamMessages.filter((message) => message.chatId === chatId);
+    const merged = [...baseMessages, ...selectedStreamMessages];
 
     const byId = new Map<string, ChatMessage>();
     merged.forEach((msg) => {
@@ -124,7 +152,13 @@ function ChatPanel({
     });
 
     return sortChatMessages(Array.from(byId.values()));
-  }, [publicMessages, fallbackMessages, streamMessages]);
+  }, [chatId, historyMessages, streamMessages]);
+
+  React.useEffect(() => {
+    setDraftMessage('');
+    setAttachments([]);
+    setAttachmentError('');
+  }, [chatId]);
 
   React.useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -147,7 +181,9 @@ function ChatPanel({
     });
   }, [isOpen, lastMessage?.chatId, lastMessage?.createdAt, lastSeenRequestKey, setChatLastSeen]);
 
-  const canSendMessage = Boolean(pluginApi.serverCommands?.chat?.sendPublicChatMessage);
+  const canSendMessage = Boolean(chatId && (isPublic
+    ? pluginApi.serverCommands?.chat?.sendPublicChatMessage
+    : pluginApi.serverCommands?.chat?.sendChatMessage));
   const trimmedDraftMessage = draftMessage.trim();
   const canSubmit = canSendMessage
     && !attachmentUploading
@@ -197,9 +233,16 @@ function ChatPanel({
     const attachmentMarkers = attachments.map(serializeChatAttachment);
     const outgoingMessage = [trimmedDraftMessage, ...attachmentMarkers].filter(Boolean).join('\n');
 
-    pluginApi.serverCommands?.chat.sendPublicChatMessage({
-      textMessageInMarkdownFormat: outgoingMessage,
-    });
+    if (isPublic) {
+      pluginApi.serverCommands?.chat.sendPublicChatMessage({
+        textMessageInMarkdownFormat: outgoingMessage,
+      });
+    } else {
+      pluginApi.serverCommands?.chat.sendChatMessage({
+        chatId,
+        textMessageInMarkdownFormat: outgoingMessage,
+      });
+    }
     setDraftMessage('');
     setAttachments([]);
     setAttachmentError('');
@@ -252,11 +295,31 @@ function ChatPanel({
         }}
       >
         <span style={{
-          color: '#fff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px',
+          color: '#fff', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0,
         }}
         >
-          <i className="icon-bbb-group_chat" />
-          {intl.formatMessage(intlMessages.title)}
+          {!isPublic && (
+            <button
+              type="button"
+              onClick={onShowPublicChat}
+              aria-label={intl.formatMessage(intlMessages.backToPublic)}
+              title={intl.formatMessage(intlMessages.backToPublic)}
+              style={{
+                border: 0,
+                background: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                padding: '0 2px',
+                fontSize: '16px',
+              }}
+            >
+              ←
+            </button>
+          )}
+          <i className={`icon-bbb-${isPublic ? 'group_chat' : 'chat'}`} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {chatTitle || intl.formatMessage(intlMessages.title)}
+          </span>
         </span>
         <button
           type="button"
@@ -288,7 +351,19 @@ function ChatPanel({
           gap: '4px',
         }}
       >
-        {messages.length === 0 && (
+        {!chatId ? (
+          <div
+            style={{
+              color: 'rgba(255,255,255,0.5)',
+              textAlign: 'center',
+              marginTop: '16px',
+              fontSize: '12px',
+            }}
+          >
+            {intl.formatMessage(intlMessages.openingPrivate)}
+          </div>
+        ) : null}
+        {chatId && messages.length === 0 && (
           <div
             style={{
               color: 'rgba(255,255,255,0.35)',

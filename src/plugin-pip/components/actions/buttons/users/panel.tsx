@@ -46,6 +46,7 @@ const intlMessages = defineMessages({
   presenter: { id: 'plugin.users.panel.presenter', defaultMessage: 'Presenter' },
   guest: { id: 'plugin.users.panel.guest', defaultMessage: 'Guest' },
   actions: { id: 'plugin.users.panel.actions', defaultMessage: 'Quick actions' },
+  privateMessage: { id: 'plugin.users.panel.privateMessage', defaultMessage: 'Private message' },
   mute: { id: 'plugin.users.panel.mute', defaultMessage: 'Mute' },
   unmute: { id: 'plugin.users.panel.unmute', defaultMessage: 'Unmute' },
   makePresenter: { id: 'plugin.users.panel.makePresenter', defaultMessage: 'Make presenter' },
@@ -79,6 +80,7 @@ interface UsersPanelProps {
   pluginApi: PluginApi;
   onClose: () => void;
   actionsHeight: number;
+  onPrivateChat: (userId: string, userName: string) => void;
 }
 
 interface ActionDefinition {
@@ -125,7 +127,7 @@ function getInitials(name: string): string {
 }
 
 function UsersPanel({
-  intl, pluginApi, onClose, actionsHeight,
+  intl, pluginApi, onClose, actionsHeight, onPrivateChat,
 }: UsersPanelProps): React.ReactNode {
   const [search, setSearch] = React.useState('');
   const [expandedUserId, setExpandedUserId] = React.useState<string | null>(null);
@@ -208,6 +210,15 @@ function UsersPanel({
     const isInAudio = Boolean(voice?.joined && !voice?.deafened);
     const isListenOnly = Boolean(voice?.listenOnly || voice?.listenOnlyInputDevice);
     const hasAuthority = isModerator || isCurrentUser;
+
+    if (!isCurrentUser && !user.bot && !user.isDialIn) {
+      actions.push({
+        id: 'private-message',
+        label: intl.formatMessage(intlMessages.privateMessage),
+        icon: 'chat',
+        onClick: () => onPrivateChat(user.userId, user.name),
+      });
+    }
 
     if (hasAuthority && isInAudio && !isListenOnly && !isBreakout) {
       if (!voice?.muted) {
