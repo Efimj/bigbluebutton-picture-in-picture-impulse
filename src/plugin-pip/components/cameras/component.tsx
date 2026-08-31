@@ -8,15 +8,22 @@ import { range } from './utils';
 import { useLayoutContext } from '../contexts/layout';
 import { usePipWindow } from '../contexts/pip-window';
 
-const createVideoSelector = (streamId: string) => `.video-provider_list .videoContainer[data-stream="${streamId}"] video`;
-
 const getVideoSrc = (
   streamId: string,
-  container?: Element | null,
+  cameraDomElements?: HTMLDivElement[],
 ): MediaStream | null => {
-  const selector = createVideoSelector(streamId);
-  const element = (container || document.body).querySelector(selector);
-  return element instanceof HTMLVideoElement && element.srcObject
+  const requestedContainer = cameraDomElements?.find(
+    (container) => container.getAttribute('data-stream') === streamId,
+  );
+  // Keep a DOM fallback for the short interval before the SDK hook delivers its
+  // first update. Compare data-stream directly instead of nesting a
+  // `.video-provider_list` selector inside that same element.
+  const fallbackContainer = Array.from(document.querySelectorAll<HTMLDivElement>(
+    '.video-provider_list .videoContainer',
+  )).find((container) => container.getAttribute('data-stream') === streamId);
+  const element = (requestedContainer || fallbackContainer)?.querySelector<HTMLVideoElement>('video');
+
+  return element?.srcObject
     ? element.srcObject as MediaStream
     : null;
 };
@@ -94,7 +101,9 @@ const findOptimalGrid = (
 
 const extractVideoStreamIds = (container: Element | null): string[] => {
   const items = container ? Array.from(container.querySelectorAll('.videoContainer')) : [];
-  return items.map((item) => item.getAttribute('data-stream'));
+  return items
+    .map((item) => item.getAttribute('data-stream'))
+    .filter((streamId): streamId is string => Boolean(streamId));
 };
 
 const VIDEO_LIST_CLASSNAME = 'video-provider_list';
@@ -125,6 +134,13 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
     data: videoStreamsData,
     error: videoStreamsError,
   } = useVideoStreams(pluginApi);
+  const requestedStreamIds = React.useMemo(
+    () => (videoStreamsData?.user_camera || []).map(({ streamId }) => streamId),
+    [videoStreamsData],
+  );
+  // This hook also tells BBB core to keep the requested remote camera elements
+  // mounted. That is required when pagination/selective subscription is enabled.
+  const cameraDomElements = pluginApi.useUserCameraDomElements!(requestedStreamIds);
   const {
     data: participantsData,
     loading: participantsLoading,
@@ -147,7 +163,7 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
 
       const videoSrc = streams.map(
         (stream) => {
-          const srcObject = getVideoSrc(stream.streamId, videoList);
+          const srcObject = getVideoSrc(stream.streamId, cameraDomElements);
 
           if (srcObject) {
             return {
@@ -194,13 +210,13 @@ function CamerasComponent({ pluginApi }: CamerasComponentProps): React.ReactNode
     // MutationObserver cannot see that transition. Retry only while at least
     // one subscribed stream has not acquired its MediaStream yet.
     const retryTimer = unresolvedStreamCount > 0
-      ? window.setTimeout(() => setLastUpdate(Date.now()), 1000)
+      ? window.setTimeout(() => setLastUpdate(Date.now()), 500)
       : undefined;
 
     return () => {
       if (retryTimer) window.clearTimeout(retryTimer);
     };
-  }, [videoStreamsData, participantsData, loading, lastUpdate]);
+  }, [videoStreamsData, participantsData, cameraDomElements, loading, lastUpdate]);
 
   useEffect(() => {
     if (!videoStreamsError && !participantsError) return;

@@ -9,26 +9,8 @@ interface Media {
   srcObject: MediaProvider;
 }
 
-const pollForScreenshareSrc = (
-  container: Element = document.body,
-): Promise<Media> => new Promise((resolve, reject) => {
-  const TIMEOUT = 5000; // 5 seconds
-  const start = performance.now();
-
-  const poll = () => {
-    const timestamp: number = performance.now();
-    const element = container.querySelector('#screenshareContainer video');
-    if (element && element instanceof HTMLVideoElement && element.srcObject) {
-      return resolve({ srcObject: element.srcObject });
-    }
-    if (timestamp - start > TIMEOUT) {
-      return reject();
-    }
-    return setTimeout(poll);
-  };
-
-  setTimeout(poll);
-});
+const getScreenshareSrc = (): MediaProvider | null => document
+  .querySelector<HTMLVideoElement>('#screenshareContainer video')?.srcObject ?? null;
 
 interface ScreenshareComponentProps {
   pluginApi: PluginApi;
@@ -45,21 +27,41 @@ function ScreenshareComponent(
   const { screenshare: screenshareRect } = useLayoutContext();
 
   React.useEffect(() => {
-    async function update() {
-      const isSharing = Boolean(screenshareData?.screenshare[0]?.stream);
-
-      if (isSharing) {
-        const src = await pollForScreenshareSrc();
-        setScreenshare(src);
-        return;
-      }
-
+    const streamId = screenshareData?.screenshare[0]?.stream;
+    if (!streamId) {
       setScreenshare(null);
+      setLoading(false);
+      return undefined;
     }
 
     setLoading(true);
-    update().finally(() => setLoading(false));
-  }, [screenshareData]);
+    const syncScreenshare = () => {
+      const srcObject = getScreenshareSrc();
+      if (!srcObject) {
+        setScreenshare(null);
+        setLoading(true);
+        return;
+      }
+
+      setScreenshare((current) => (
+        current?.srcObject === srcObject ? current : { srcObject }
+      ));
+      setLoading(false);
+    };
+
+    syncScreenshare();
+    // `srcObject` is a JS property: assigning it does not produce a DOM mutation.
+    // Poll while sharing, and use an observer as a fast path when BBB remounts the
+    // screenshare container during layout changes.
+    const interval = window.setInterval(syncScreenshare, 500);
+    const observer = new MutationObserver(syncScreenshare);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      window.clearInterval(interval);
+      observer.disconnect();
+    };
+  }, [screenshareData?.screenshare[0]?.stream]);
 
   if (!screenshare && !loading) {
     return null;
